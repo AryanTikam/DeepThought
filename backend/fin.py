@@ -168,7 +168,7 @@ class StoryVectorDatabase:
 
         # Save updated metadata
         self._save_metadata()
-
+        self._reconcile_story_information()
         print(
             f"File {file_id} processed and added to vector database for folder {self.folder_name}."
         )
@@ -185,9 +185,6 @@ class StoryVectorDatabase:
         for file_name in os.listdir(self.folder_path):
             if file_name.endswith(".txt"):
                 self.process_file(file_name)
-
-        # Reconcile story information after processing all files
-        self._reconcile_story_information()
 
         print(f"All files in folder {self.folder_name} processed.")
 
@@ -386,7 +383,7 @@ class StoryVectorDatabase:
         """Reconcile information across all story files to update character identities, timeline, and contradictions."""
         if not self.metadata["files_processed"]:
             return
-
+        print("Reconciling story information across all files...")
         llm = get_llm()
 
         # Prepare all character information
@@ -408,6 +405,7 @@ class StoryVectorDatabase:
         RECONCILED CHARACTER LIST:
         """
         reconciled_characters = llm.invoke(character_reconcile_prompt)
+        print(f"Reconciled characters: {reconciled_characters}")
         self.metadata["reconciled_characters"] = _extract_content_from_response(
             reconciled_characters
         )
@@ -582,21 +580,29 @@ class StoryVectorDatabase:
 
         # Create query with context and conversation history
         query_prompt = f"""
-        Your are a writer's assistant.
-        Answer the following question based on the provided context and previous conversation.
-        Use the context and conversation history to provide a detailed answer.
-        Help the writer identify if their question contradicts the story.
-        also help them explore new ideas and directions for the story while maintaining continuity.
-        If the answer is not clear, suggest possible interpretations or directions.
-        if the user asks anything outside of the story, reply with "Sorry, that isn't part of the Universe"
-        only reply with the answer and cite sources for whatever you say(eg: this was mentioned in book1 sentence: "", this contradicts x mentioned in book1 sentence: ""). 
+        You are a writer's assistant.
+
+        Your role is to:
+        - Answer the user's current question using the provided story context and conversation history.
+        - Identify any contradictions between the question and existing story elements.
+        - Suggest new ideas or narrative directions that maintain story continuity.
+        - If the user's question is unclear, propose possible interpretations or directions they could take.
+        - If the user asks something unrelated to the fictional universe, respond only with: "Sorry, that isn't part of the Universe." but still allow user to explore new paths for their story
+
+        Instructions:
+        - Base your answer strictly on the context and conversation history.
+        - Support your response with citations from the story. For example: (as mentioned in Book 1, sentence: "").
+        - Clearly explain if the current question contradicts the established story, citing specific parts.
+
         CONTEXT:
         {context}
-        
+
+        CONVERSATION HISTORY:
         {conversation_context}
-        
-        CURRENT QUESTION WITH CITE: {question}
-        
+
+        CURRENT QUESTION WITH CITE:
+        {question}
+
         DETAILED ANSWER:
         """
 
@@ -830,40 +836,38 @@ def analysis(folder_path: str):
     for book in metadata["files_processed"]:
         formatted[book] = {}
         # Remove anything before the first \n\n*
-        _, _, characters = metadata["character_info"][book].partition("\n\n*")
+        _, _, characters = metadata["character_info"][book].partition("\n\n")
         formatted[book]["characters"] = characters
 
         for event in metadata["timeline_events"]:
             if event["file_id"] == book:
-                _, _, timeline = event["events"].partition("\n\n*")
+                _, _, timeline = event["events"].partition("\n\n")
                 formatted[book]["timeline"] = timeline
                 break
 
         for contradiction in metadata["potential_contradictions"]:
             if contradiction["file_id"] == book:
-                _, _, contradictions = contradiction["contradictions"].partition(
-                    "\n\n*"
-                )
-                _, _, resolution = contradiction["resolution"].partition("\n\n*")
+                _, _, contradictions = contradiction["contradictions"].partition("\n\n")
+                _, _, resolution = contradiction["resolution"].partition("\n\n")
                 formatted[book]["contradictions"] = contradictions
                 formatted[book]["resolution"] = resolution
                 break
 
     # Add overall reconciled data
     _, _, character_revelations = metadata.get("reconciled_characters", "").partition(
-        "\n\n*"
+        "\n\n"
     )
     formatted["character_revelations"] = character_revelations
 
-    _, _, timeline = metadata.get("unified_timeline", "").partition("\n\n*")
+    _, _, timeline = metadata.get("unified_timeline", "").partition("\n\n")
     formatted["timeline"] = timeline
 
     _, _, overall_contradictions = metadata.get("overall_contradictions", "").partition(
-        "\n\n*"
+        "\n\n"
     )
     formatted["overall_contradictions"] = overall_contradictions
 
-    _, _, overall_resolution = metadata.get("overall_resolution", "").partition("\n\n*")
+    _, _, overall_resolution = metadata.get("overall_resolution", "").partition("\n\n")
     formatted["overall_resolution"] = overall_resolution
 
     return formatted

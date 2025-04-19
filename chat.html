@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat Bot</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        background-color: #f4f4f9;
+      }
+      #chat-container {
+        width: 100%;
+        max-width: 600px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background: #fff;
+        padding: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      #chat-box {
+        height: 400px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin-bottom: 10px;
+        background: #fafafa;
+      }
+      .message {
+        margin: 5px 0;
+      }
+      .user {
+        text-align: right;
+        color: blue;
+      }
+      .bot {
+        text-align: left;
+        color: green;
+      }
+      #input-container {
+        display: flex;
+        gap: 10px;
+      }
+      #message-input {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      #send-button {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      #send-button:hover {
+        background-color: #0056b3;
+      }
+    </style>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const chatBox = document.getElementById("chat-box");
+        const messageInput = document.getElementById("message-input");
+        const sendButton = document.getElementById("send-button");
+
+        // Load chat history from localStorage
+        const chatHistory =
+          JSON.parse(localStorage.getItem("chatHistory")) || [];
+        chatHistory.forEach(({ sender, message }) => {
+          addMessageToChatBox(sender, message);
+        });
+
+        sendButton.addEventListener("click", async () => {
+          const userMessage = messageInput.value.trim();
+          if (!userMessage) return;
+
+          // Add user message to chat box
+          addMessageToChatBox("user", userMessage);
+          saveMessageToHistory("user", userMessage);
+
+          // Send message to chat_bot API
+          const response = await fetch("/chat_bot", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              folder_path:
+                "/mnt/Windows-SSD/Users/yvavi/yeet/coding/python/DeepThought/DeepThought/universes/random",
+              message: userMessage,
+            }),
+          });
+
+          const result = await response.json();
+          const botMessage = result.answer || "No response";
+
+          // Add bot response to chat box
+          addMessageToChatBox("bot", botMessage);
+          saveMessageToHistory("bot", botMessage);
+
+          // Clear input field
+          messageInput.value = "";
+        });
+
+        function addMessageToChatBox(sender, message) {
+          const messageElement = document.createElement("div");
+          messageElement.classList.add("message", sender);
+          messageElement.textContent = message;
+          chatBox.appendChild(messageElement);
+          chatBox.scrollTop = chatBox.scrollHeight; // Scroll to the bottom
+        }
+
+        function saveMessageToHistory(sender, message) {
+          chatHistory.push({ sender, message });
+          localStorage.setItem("chatHistory", JSON.stringify(chatHistory));
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <div id="chat-container">
+      <div id="chat-box"></div>
+      <div id="input-container">
+        <input
+          type="text"
+          id="message-input"
+          placeholder="Type your message here..."
+        />
+        <button id="send-button">Send</button>
+      </div>
+    </div>
+  </body>
+</html>

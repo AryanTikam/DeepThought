@@ -2,6 +2,4 @@ DeepThought/universes/hitch
 DeepThought/universes/random
 .env
 backend/apis.py
-app.py
-index.html
-book.txt
+backend/__pycache__

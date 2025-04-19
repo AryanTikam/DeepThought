@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Tester</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+      async function callApi(endpoint, data) {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        });
+        const result = await response.json();
+        if (endpoint === "/analysis") {
+          displayAnalysis(result);
+        } else {
+          document.getElementById("output").textContent = JSON.stringify(
+            result,
+            null,
+            2
+          );
+        }
+      }
+
+      async function listFiles() {
+        const response = await fetch("/list_files");
+        const result = await response.json();
+        document.getElementById("output").textContent = JSON.stringify(
+          result,
+          null,
+          2
+        );
+      }
+
+      function displayAnalysis(data) {
+        const analysisContainer = document.getElementById("analysis-output");
+        analysisContainer.innerHTML = ""; // Clear previous content
+
+        for (const [key, value] of Object.entries(data)) {
+          // Create a collapsible section for each key
+          const section = document.createElement("div");
+          section.style.marginBottom = "20px";
+
+          const title = document.createElement("button");
+          title.textContent = key.replace(/_/g, " ").toUpperCase();
+          title.style.display = "block";
+          title.style.width = "100%";
+          title.style.textAlign = "left";
+          title.style.padding = "10px";
+          title.style.fontSize = "16px";
+          title.style.fontWeight = "bold";
+          title.style.border = "1px solid #ccc";
+          title.style.backgroundColor = "#f9f9f9";
+          title.style.cursor = "pointer";
+
+          const content = document.createElement("div");
+          content.style.display = "none";
+          content.style.padding = "10px";
+          content.style.border = "1px solid #ccc";
+          content.style.borderTop = "none";
+
+          // Toggle visibility of the content
+          title.addEventListener("click", () => {
+            content.style.display =
+              content.style.display === "none" ? "block" : "none";
+          });
+
+          if (typeof value === "string") {
+            // Render Markdown if the value is a string
+            const markdownContent = document.createElement("div");
+            markdownContent.innerHTML = marked.parse(value);
+            content.appendChild(markdownContent);
+          } else if (typeof value === "object" && value !== null) {
+            // Handle nested objects (e.g., JSON)
+            for (const [nestedKey, nestedValue] of Object.entries(value)) {
+              const nestedSection = document.createElement("div");
+              nestedSection.style.marginLeft = "20px";
+
+              const nestedTitle = document.createElement("h4");
+              nestedTitle.textContent = nestedKey.replace(/_/g, " ");
+              nestedSection.appendChild(nestedTitle);
+
+              if (typeof nestedValue === "string") {
+                const nestedMarkdownContent = document.createElement("div");
+                nestedMarkdownContent.innerHTML = marked.parse(nestedValue);
+                nestedSection.appendChild(nestedMarkdownContent);
+              } else {
+                const pre = document.createElement("pre");
+                pre.textContent = JSON.stringify(nestedValue, null, 2);
+                nestedSection.appendChild(pre);
+              }
+
+              content.appendChild(nestedSection);
+            }
+          } else {
+            const paragraph = document.createElement("p");
+            paragraph.textContent = value || "No data available";
+            content.appendChild(paragraph);
+          }
+
+          section.appendChild(title);
+          section.appendChild(content);
+          analysisContainer.appendChild(section);
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <h1>API Tester</h1>
+    <div>
+      <h3>File Deleted</h3>
+      <button
+        onclick="callApi('/file_deleted', { file_name: 'test.md', folder_path: 'DeepThought/universes/random' })"
+      >
+        Delete File
+      </button>
+    </div>
+    <div>
+      <h3>Folder Deleted</h3>
+      <button
+        onclick="callApi('/folder_deleted', { folder_path: 'DeepThought/universes/random' })"
+      >
+        Delete Folder
+      </button>
+    </div>
+    <div>
+      <h3>File Uploaded</h3>
+      <button
+        onclick="callApi('/file_uploaded', { folder_path: 'DeepThought/universes/random', file_name: 'test.md' })"
+      >
+        Upload File
+      </button>
+    </div>
+    <div>
+      <h3>Chat Bot</h3>
+      <button
+        onclick="callApi('/chat_bot', { folder_path: 'DeepThought/universes/random', message: 'Hello!' })"
+      >
+        Chat
+      </button>
+    </div>
+    <div>
+      <h3>Analysis</h3>
+      <button
+        onclick="callApi('/analysis', { folder_path: '/mnt/Windows-SSD/Users/yvavi/yeet/coding/python/DeepThought/DeepThought/universes/random' })"
+      >
+        Analyze
+      </button>
+    </div>
+    <div>
+      <h3>List Files</h3>
+      <button onclick="listFiles()">List Files</button>
+    </div>
+    <h2>Output</h2>
+    <pre id="output"></pre>
+    <h2>Analysis Output</h2>
+    <div
+      id="analysis-output"
+      style="border: 1px solid #ccc; padding: 10px"
+    ></div>
+  </body>
+</html>
