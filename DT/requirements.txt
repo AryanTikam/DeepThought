@@ -1,0 +1,10 @@
+flask
+uvicorn
+langchain
+langchain-community
+langchain-google-genai
+openai
+python-dotenv
+faiss-cpu
+networkx
+pydantic
