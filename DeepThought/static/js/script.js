@@ -829,6 +829,7 @@ function renderContradictionReport(data, universeName) {
     </div>
   `;
 }
+
 function drawGraph(graphData, containerId) {
   // This is a placeholder for D3.js code
   // In a real implementation, you would use D3.js to draw the graph
@@ -981,26 +982,77 @@ function renderContradictionReport(data, universeName) {
   const contradictions = data.contradictions || [];
   const speculationBoundaries = data.speculation_boundaries || [];
   
+  // Calculate statistics
+  const totalContradictions = contradictions.length;
+  const highConfidenceContradictions = contradictions.filter(c => c.confidence >= 0.8).length;
+  const mediumConfidenceContradictions = contradictions.filter(c => c.confidence >= 0.5 && c.confidence < 0.8).length;
+  const lowConfidenceContradictions = contradictions.filter(c => c.confidence < 0.5).length;
+
   // Create HTML for contradictions
   let contradictionsHTML = '';
   if (contradictions.length > 0) {
     contradictionsHTML = `
       <div class="contradictions-section">
-        <h3><i class="fas fa-exclamation-triangle"></i> Contradictions Found (${contradictions.length})</h3>
+        <div class="section-header">
+          <h3><i class="fas fa-exclamation-triangle"></i> Contradictions Analysis</h3>
+          <div class="stats-badge">
+            <span class="count">${totalContradictions}</span>
+            <span class="label">Potential Issues</span>
+          </div>
+        </div>
+        
+        <div class="confidence-distribution">
+          <div class="confidence-item high">
+            <span class="confidence-label">High Confidence</span>
+            <span class="confidence-value">${highConfidenceContradictions}</span>
+          </div>
+          <div class="confidence-item medium">
+            <span class="confidence-label">Medium Confidence</span>
+            <span class="confidence-value">${mediumConfidenceContradictions}</span>
+          </div>
+          <div class="confidence-item low">
+            <span class="confidence-label">Low Confidence</span>
+            <span class="confidence-value">${lowConfidenceContradictions}</span>
+          </div>
+        </div>
+        
         <div class="contradictions-list">
           ${contradictions.map((c, i) => `
             <div class="contradiction-item">
               <div class="contradiction-header">
-                <span class="contradiction-number">#${i+1}</span>
-                <span class="contradiction-confidence">Confidence: ${(c.confidence * 100).toFixed(0)}%</span>
+                <span class="contradiction-number">Issue #${i+1}</span>
+                <span class="contradiction-confidence ${getConfidenceClass(c.confidence)}">
+                  ${getConfidenceText(c.confidence)} (${(c.confidence * 100).toFixed(0)}%)
+                </span>
               </div>
               <div class="contradiction-statements">
-                <p class="statement statement-1">"${c.conflicting_statements[0]}"</p>
-                <div class="contradiction-vs">VS</div>
-                <p class="statement statement-2">"${c.conflicting_statements[1]}"</p>
+                <div class="statement-container">
+                  <div class="statement-marker">Statement A</div>
+                  <p class="statement">"${c.conflicting_statements[0]}"</p>
+                </div>
+                <div class="contradiction-vs">
+                  <div class="vs-line"></div>
+                  <div class="vs-text">CONFLICTS WITH</div>
+                  <div class="vs-line"></div>
+                </div>
+                <div class="statement-container">
+                  <div class="statement-marker">Statement B</div>
+                  <p class="statement">"${c.conflicting_statements[1]}"</p>
+                </div>
               </div>
               <div class="contradiction-description">
-                <p><strong>Analysis:</strong> ${c.description}</p>
+                <div class="description-header">
+                  <i class="fas fa-search"></i> Analysis
+                </div>
+                <p>${c.description || 'No detailed analysis available for this contradiction.'}</p>
+                ${c.suggested_resolution ? `
+                <div class="resolution">
+                  <div class="resolution-header">
+                    <i class="fas fa-lightbulb"></i> Suggested Resolution
+                  </div>
+                  <p>${c.suggested_resolution}</p>
+                </div>
+                ` : ''}
               </div>
             </div>
           `).join('')}
@@ -1010,8 +1062,11 @@ function renderContradictionReport(data, universeName) {
   } else {
     contradictionsHTML = `
       <div class="contradictions-section empty">
-        <h3><i class="fas fa-check-circle"></i> No Contradictions Found</h3>
-        <p>The statements in this universe are consistent with each other.</p>
+        <div class="success-message">
+          <i class="fas fa-check-circle"></i>
+          <h3>No Contradictions Detected</h3>
+          <p>All statements in this universe appear to be logically consistent.</p>
+        </div>
       </div>
     `;
   }
@@ -1030,17 +1085,45 @@ function renderContradictionReport(data, universeName) {
     
     speculationHTML = `
       <div class="speculation-section">
-        <h3><i class="fas fa-lightbulb"></i> Speculation Analysis</h3>
+        <div class="section-header">
+          <h3><i class="fas fa-lightbulb"></i> Speculation & Uncertainty Analysis</h3>
+          <div class="stats-badge">
+            <span class="count">${speculationBoundaries.length}</span>
+            <span class="label">Elements</span>
+          </div>
+        </div>
+        
+        <div class="speculation-intro">
+          <p>The following elements in your universe have been identified as speculative or uncertain. 
+          These may require additional verification or clarification to ensure consistency.</p>
+        </div>
+        
         <div class="speculation-categories">
           ${Object.keys(groupedSpeculations).map(category => `
             <div class="speculation-category ${category.toLowerCase()}">
-              <h4>${category} Statements (${groupedSpeculations[category].length})</h4>
+              <div class="category-header">
+                <h4>${category}</h4>
+                <span class="item-count">${groupedSpeculations[category].length} items</span>
+              </div>
               <ul class="speculation-list">
                 ${groupedSpeculations[category].map(item => `
                   <li class="speculation-item">
-                    <span class="confidence-indicator" style="width: ${item.confidence * 100}%"></span>
-                    <span class="speculation-text">"${item.element}"</span>
-                    <span class="speculation-confidence">${(item.confidence * 100).toFixed(0)}%</span>
+                    <div class="confidence-meter">
+                      <div class="confidence-fill" style="width: ${item.confidence * 100}%"></div>
+                    </div>
+                    <div class="speculation-content">
+                      <div class="speculation-text">"${item.element}"</div>
+                      <div class="speculation-meta">
+                        <span class="confidence-value ${getConfidenceClass(item.confidence)}">
+                          ${getConfidenceText(item.confidence)} (${(item.confidence * 100).toFixed(0)}%)
+                        </span>
+                        ${item.context ? `
+                        <div class="speculation-context">
+                          <i class="fas fa-info-circle"></i> ${item.context}
+                        </div>
+                        ` : ''}
+                      </div>
+                    </div>
                   </li>
                 `).join('')}
               </ul>
@@ -1052,8 +1135,11 @@ function renderContradictionReport(data, universeName) {
   } else {
     speculationHTML = `
       <div class="speculation-section empty">
-        <h3><i class="fas fa-question-circle"></i> No Speculation Analysis Available</h3>
-        <p>Add more content to generate speculation boundaries.</p>
+        <div class="info-message">
+          <i class="fas fa-info-circle"></i>
+          <h3>No Speculative Elements Found</h3>
+          <p>All elements in this universe appear to be well-established facts.</p>
+        </div>
       </div>
     `;
   }
@@ -1061,11 +1147,56 @@ function renderContradictionReport(data, universeName) {
   // Combine everything
   chatOutput.innerHTML = `
     <div class="contradiction-report">
-      <h2><i class="fas fa-file-alt"></i> Contradiction Report: ${universeName}</h2>
+      <div class="report-header">
+        <h2><i class="fas fa-file-contract"></i> Universe Consistency Report: ${universeName}</h2>
+        <p class="report-subtitle">Analysis of logical consistency and factual certainty</p>
+      </div>
+      
+      <div class="report-summary">
+        <div class="summary-card ${contradictions.length > 0 ? 'warning' : 'success'}">
+          <div class="summary-icon">
+            <i class="${contradictions.length > 0 ? 'fas fa-exclamation-triangle' : 'fas fa-check-circle'}"></i>
+          </div>
+          <div class="summary-content">
+            <h4>${contradictions.length > 0 ? 'Potential Issues Found' : 'No Issues Detected'}</h4>
+            <p>${contradictions.length > 0 ? 
+              'Review the contradictions below to improve consistency' : 
+              'Your universe maintains good internal consistency'}
+            </p>
+          </div>
+        </div>
+        
+        <div class="summary-card info">
+          <div class="summary-icon">
+            <i class="fas fa-lightbulb"></i>
+          </div>
+          <div class="summary-content">
+            <h4>Speculative Content</h4>
+            <p>${speculationBoundaries.length > 0 ? 
+              `${speculationBoundaries.length} elements require verification` : 
+              'No uncertain elements detected'}
+            </p>
+          </div>
+        </div>
+      </div>
+      
       ${contradictionsHTML}
       ${speculationHTML}
     </div>
   `;
+}
+
+// Helper functions for confidence levels
+function getConfidenceClass(confidence) {
+  if (confidence >= 0.8) return 'high-confidence';
+  if (confidence >= 0.5) return 'medium-confidence';
+  return 'low-confidence';
+}
+
+function getConfidenceText(confidence) {
+  if (confidence >= 0.8) return 'High Confidence';
+  if (confidence >= 0.5) return 'Medium Confidence';
+  return 'Low Confidence';
 }
 
 // Handle file uploads and processing
