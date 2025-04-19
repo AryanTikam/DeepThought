@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Analysis Results</title>
+  </head>
+  <body>
+    <h1>Entities Extracted</h1>
+    <ul>
+      {% for entity in entities %}
+      <li>{{ entity.type }}: {{ entity.name }}</li>
+      {% endfor %}
+    </ul>
+
+    <h2>Contradictions Detected</h2>
+    <ul>
+      {% for contradiction in contradictions %}
+      <li>{{ contradiction.description }}</li>
+      {% endfor %}
+    </ul>
+
+    <h2>In-Universe Explanations</h2>
+    <ul>
+      {% for explanation in explanations %}
+      <li>{{ explanation }}</li>
+      {% endfor %}
+    </ul>
+  </body>
+</html>
