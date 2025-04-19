@@ -16,7 +16,7 @@ API_KEY = os.getenv("GOOGLE_API_KEY")
 if not API_KEY:
     raise ValueError("GOOGLE_API_KEY not found in environment variables.")
 
-MODEL_NAME = "gemini-1.5-flash-latest" # Using the latest available Flash model
+MODEL_NAME = "gemini-2.0-flash" 
 CHUNK_SIZE = 2000 # Adjust based on typical document structure and context window needs
 CHUNK_OVERLAP = 200
 SIMILARITY_K = 5 # Number of relevant chunks to retrieve for context
