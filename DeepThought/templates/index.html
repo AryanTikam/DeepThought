@@ -1,93 +1,76 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>F.U.C.K.IT - Fictional Universe Consistency Kit</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 20px;
-        line-height: 1.6;
-      }
-      .container {
-        max-width: 800px;
-        margin: 0 auto;
-      }
-      h1 {
-        color: #2c3e50;
-      }
-      form {
-        background: #f9f9f9;
-        padding: 20px;
-        border-radius: 5px;
-        margin-top: 20px;
-      }
-      label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-      }
-      input, button {
-        padding: 8px;
-        margin-bottom: 15px;
-      }
-      button {
-        background: #3498db;
-        color: white;
-        border: none;
-        cursor: pointer;
-        padding: 10px 15px;
-      }
-      .checkbox-label {
-        display: flex;
-        align-items: center;
-      }
-      .checkbox-label input {
-        margin-right: 10px;
-      }
-      .nav {
-        display: flex;
-        gap: 15px;
-        margin-bottom: 20px;
-      }
-      .nav a {
-        text-decoration: none;
-        color: #3498db;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <h1>Fictional Universe Consistency Kit</h1>
-      
-      <div class="nav">
-        <a href="/">Home</a>
-        <a href="/documents">View Documents</a>
-        <a href="/graph">View Knowledge Graph</a>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Universe Chat</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <div class="toggle-container">
+      <button class="toggle-btn" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
+        <i class="fas fa-bars"></i>
+      </button>
+    </div>
+    
+    <div class="sidebar-header">
+      <h2>Universes</h2>
+      <div class="action-buttons">
+        <button class="btn-add" onclick="addUniverse()">
+          <i class="fas fa-plus"></i> New Universe
+        </button>
+        <button class="btn-delete" onclick="deleteUniverse()">
+          <i class="fas fa-trash"></i> Delete
+        </button>
+      </div>
+    </div>
+    
+    <div id="universe-list" class="explorer"></div>
+  </div>
+
+  <div class="main-content" id="main-content">
+    <div class="top-bar">
+      <div class="logo">
+        <i class="fas fa-satellite"></i>
+        <span>Universe Chat</span>
+      </div>
+      <div class="action-buttons">
+        <button class="btn-primary" onclick="showKnowledgeGraph()">
+          <i class="fas fa-brain"></i> Knowledge Graph
+        </button>
+        <button class="btn-secondary" onclick="showContradictionReport()">
+          <i class="fas fa-file-alt"></i> Contradiction Report
+        </button>
+      </div>
+    </div>
+
+    <div class="chat-section">
+      <div id="chat-output" class="chat-output">
+        <div class="welcome-message">
+          <h2><i class="fas fa-robot"></i> Welcome to Universe Chat</h2>
+          <p>Create or select a universe to begin exploring possibilities</p>
+        </div>
       </div>
       
-      <form action="/upload" method="post" enctype="multipart/form-data">
-        <h2>Upload a Fictional Text</h2>
-        
-        <label for="textfile">Text File (TXT format only)</label>
-        <input type="file" name="textfile" id="textfile" accept=".txt" required />
-        
-        <label for="title">Document Title</label>
-        <input type="text" name="title" id="title" placeholder="Enter document title">
-        
-        <label for="author">Author</label>
-        <input type="text" name="author" id="author" placeholder="Enter author name">
-        
-        <label for="year">Year</label>
-        <input type="text" name="year" id="year" placeholder="Enter publication year">
-        
-        <label class="checkbox-label">
-          <input type="checkbox" name="canonical" id="canonical">
-          Mark as canonical source (highest precedence for contradiction resolution)
-        </label>
-        
-        <button type="submit">Analyze Text</button>
-      </form>
+      <div class="chat-input">
+        <div class="input-group">
+          <input type="text" id="user-input" placeholder="Type your message here...">
+          <label for="file-upload" class="file-upload-label">
+            <i class="fas fa-paperclip"></i>
+          </label>
+          <input type="file" id="file-upload" multiple accept=".txt,.pdf,.docx" />
+          <button class="send-btn" onclick="sendMessage()">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
     </div>
-  </body>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+</body>
 </html>

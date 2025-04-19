@@ -1,782 +1,1124 @@
-// script.js - Frontend JavaScript for the Fictional Universe Consistency Kit
+let universeCounter = 0;
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Tab navigation
-    const tabLinks = document.querySelectorAll('.nav-link');
-    const contentSections = document.querySelectorAll('.content-section');
-    const pageTitleElement = document.getElementById('pageTitle');
-    
-    tabLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            // Remove active class from all tabs and content sections
-            tabLinks.forEach(tab => tab.classList.remove('active'));
-            contentSections.forEach(section => section.classList.remove('active'));
-            
-            // Add active class to clicked tab
-            this.classList.add('active');
-            
-            // Show corresponding content section
-            const tabId = this.id;
-            const contentId = tabId.replace('Tab', 'Interface');
-            document.getElementById(contentId).classList.add('active');
-            
-            // Update page title
-            pageTitleElement.textContent = getPageTitle(tabId);
-        });
-    });
-    
-    // Toolbar buttons in chat interface
-    document.getElementById('extractToolBtn').addEventListener('click', function() {
-        activateTab('elementsTab');
-    });
-    
-    document.getElementById('contradictionToolBtn').addEventListener('click', function() {
-        activateTab('contradictionsTab');
-    });
-    
-    document.getElementById('factCheckToolBtn').addEventListener('click', function() {
-        activateTab('factCheckTab');
-    });
-    
-    document.getElementById('graphToolBtn').addEventListener('click', function() {
-        activateTab('graphTab');
-    });
-    
-    // Chat functionality
-    const chatMessages = document.getElementById('chatMessages');
-    const chatInput = document.getElementById('chatInput');
-    const sendBtn = document.getElementById('sendBtn');
-    
-    sendBtn.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
-    });
-    
-    // Extract Elements functionality
-    const extractElementsBtn = document.getElementById('extractElementsBtn');
-    extractElementsBtn.addEventListener('click', extractElements);
-    
-    // Find Contradictions functionality
-    const findContradictionsBtn = document.getElementById('findContradictionsBtn');
-    findContradictionsBtn.addEventListener('click', findContradictions);
-    
-    // Fact Check functionality
-    const checkFactBtn = document.getElementById('checkFactBtn');
-    checkFactBtn.addEventListener('click', checkFact);
-    
-    // Knowledge Graph functionality
-    const updateGraphBtn = document.getElementById('updateGraphBtn');
-    updateGraphBtn.addEventListener('click', updateGraph);
-    
-    // Open Questions functionality
-    const findQuestionsBtn = document.getElementById('findQuestionsBtn');
-    findQuestionsBtn.addEventListener('click', findOpenQuestions);
-    
-    // Search Datasets functionality
-    const searchDatasetsBtn = document.getElementById('searchDatasetsBtn');
-    searchDatasetsBtn.addEventListener('click', searchDatasets);
-    
-    // Custom universe input toggle
-    document.getElementById('universeForQuestions').addEventListener('change', toggleCustomUniverse);
-    document.getElementById('universeForFactCheck').addEventListener('change', toggleCustomUniverse);
-    document.getElementById('universeSelector').addEventListener('change', toggleCustomUniverse);
-    
-    // Depth slider value display
-    document.getElementById('depthSlider').addEventListener('input', function() {
-        document.getElementById('depthValue').textContent = this.value;
-    });
-    
-    // Load initial data
-    loadKnowledgeGraphStats();
-    loadCharacterOptions();
-    
-    // Populate element select for graph
-    populateElementSelect();
-});
-
-// Helper functions
-function getPageTitle(tabId) {
-    const titles = {
-        'chatTab': 'Chat with Fictional Universe Consistency Kit',
-        'elementsTab': 'Extract Narrative Elements',
-        'contradictionsTab': 'Find Contradictions',
-        'factCheckTab': 'Fact Checker',
-        'graphTab': 'Knowledge Graph Explorer',
-        'openQuestionsTab': 'Open Questions & Speculation Boundaries',
-        'searchDatasetsTab': 'Search Reference Datasets'
-    };
-    return titles[tabId] || 'Fictional Universe Consistency Kit';
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.toggle('collapsed');
 }
 
-function activateTab(tabId) {
-    document.getElementById(tabId).click();
-}
+async function addUniverse() {
+  const universeName = prompt("Enter the name of the universe:", `Universe ${universeCounter + 1}`);
+  
+  if (!universeName) return; // Don't proceed if the user cancels or enters an empty name
 
-function toggleCustomUniverse(e) {
-    const customDivs = document.querySelectorAll('[id^="customUniverseInput"]');
-    customDivs.forEach(div => {
-        if (e.target.value === 'custom') {
-            div.style.display = 'block';
-        } else {
-            div.style.display = 'none';
-        }
+  try {
+    const formData = new FormData();
+    formData.append('name', universeName);
+    
+    const response = await fetch('/add-universe', {
+      method: 'POST',
+      body: formData
     });
+    
+    const data = await response.json();
+    
+    if (data.success || response.ok) {
+      const universeList = document.getElementById('universe-list');
+      const universeId = `universe-${universeCounter++}`;
+
+      const universe = document.createElement('div');
+      universe.className = 'universe';
+      universe.setAttribute('draggable', 'true');
+      universe.id = universeId;
+      universe.innerHTML = `<i class="fas fa-globe"></i> <span>${universeName}</span>`;
+      universe.addEventListener('click', () => handleUniverseClick(universeId, universeName));
+
+      const fileContainer = document.createElement('div');
+      fileContainer.className = 'file-container';
+      fileContainer.dataset.universeId = universeId;
+
+      universeList.appendChild(universe);
+      universeList.appendChild(fileContainer);
+
+      enableDragAndDrop();
+    } else {
+      alert(`Failed to create universe: ${data.error}`);
+    }
+  } catch (error) {
+    console.error("Error creating universe:", error);
+    alert("An error occurred while creating the universe.");
+  }
 }
 
-// Add typing indicator
-function showTypingIndicator() {
-    const typingIndicator = document.createElement('div');
-    typingIndicator.className = 'message-container';
-    typingIndicator.id = 'typingIndicator';
-    typingIndicator.innerHTML = `
-        <div class="typing-indicator">
-            <span></span>
-            <span></span>
-            <span></span>
+async function deleteUniverse() {
+  const selected = document.querySelector('.universe.selected');
+  if (selected) {
+    const universeId = selected.id;
+    
+    try {
+      const formData = new FormData();
+      formData.append('universeId', universeId);
+      
+      const response = await fetch('/delete-universe', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const container = document.querySelector(`[data-universe-id="${universeId}"]`);
+        selected.remove();
+        if (container) container.remove();
+
+        // Reset chat output
+        document.getElementById('chat-output').innerHTML = `
+          <div class="welcome-message">
+            <h2><i class="fas fa-robot"></i> Welcome to Universe Chat</h2>
+            <p>Create or select a universe to begin exploring possibilities</p>
+          </div>
+        `;
+      } else {
+        alert(`Failed to delete universe: ${data.error}`);
+      }
+    } catch (error) {
+      console.error("Error deleting universe:", error);
+      alert("An error occurred while deleting the universe.");
+    }
+  } else {
+    alert("Please select a universe to delete.");
+  }
+}
+
+async function handleUniverseClick(id, name) {
+  const allUniverses = document.querySelectorAll('.universe');
+  allUniverses.forEach(u => u.classList.remove('selected'));
+
+  const clicked = document.getElementById(id);
+  clicked.classList.add('selected');
+  
+  document.getElementById('chat-output').innerHTML = `<p class="loading-message">📄 Loading files from ${name || clicked.textContent.trim()}...</p>`;
+
+  try {
+    // Get files for this universe
+    const response = await fetch(`/get-universe-files?universeId=${id}`);
+    const data = await response.json();
+    
+    // Show files in the file container
+    const fileContainer = document.querySelector(`[data-universe-id="${id}"]`);
+    fileContainer.innerHTML = '';
+    fileContainer.classList.add('show');
+    
+    if (data.files && data.files.length > 0) {
+      data.files.forEach(file => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+          <span>${file}</span>
+          <button onclick="deleteFile('${id}', '${file}')">
+            <i class="fas fa-trash"></i>
+          </button>
+        `;
+        fileContainer.appendChild(fileItem);
+      });
+    } else {
+      fileContainer.innerHTML = `
+        <div class="empty-files">
+          <p><i class="fas fa-info-circle"></i> No text files in this universe yet.</p>
+          <p>Upload .txt files to begin analysis.</p>
         </div>
+      `;
+    }
+    
+    // Update chat output with universe info
+    document.getElementById('chat-output').innerHTML = `
+      <div class="universe-info">
+        <h3><i class="fas fa-globe"></i> ${name || clicked.textContent.trim()}</h3>
+        <p>Select an action from the top bar or upload text files to analyze this universe.</p>
+      </div>
     `;
-    chatMessages.appendChild(typingIndicator);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+  } catch (error) {
+    console.error("Error loading universe files:", error);
+    document.getElementById('chat-output').innerHTML = `
+      <div class="error-message">
+        <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+        <p>Failed to load universe files. Please try again.</p>
+      </div>
+    `;
+  }
 }
 
-function removeTypingIndicator() {
-    const typingIndicator = document.getElementById('typingIndicator');
-    if (typingIndicator) {
-        typingIndicator.remove();
+async function deleteFile(universeId, filename) {
+  try {
+    const formData = new FormData();
+    formData.append('universeId', universeId);
+    formData.append('filename', filename);
+    
+    const response = await fetch('/delete-file', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // Refresh the file list
+      const fileResponse = await fetch(`/get-universe-files?universeId=${universeId}`);
+      const fileData = await fileResponse.json();
+      
+      const fileContainer = document.querySelector(`[data-universe-id="${universeId}"]`);
+      fileContainer.innerHTML = '';
+      
+      if (fileData.files && fileData.files.length > 0) {
+        fileData.files.forEach(file => {
+          const fileItem = document.createElement('div');
+          fileItem.className = 'file-item';
+          fileItem.innerHTML = `
+            <span>${file}</span>
+            <button onclick="deleteFile('${universeId}', '${file}')">
+              <i class="fas fa-trash"></i>
+            </button>
+          `;
+          fileContainer.appendChild(fileItem);
+        });
+      } else {
+        fileContainer.innerHTML = `
+          <div class="empty-files">
+            <p><i class="fas fa-info-circle"></i> No text files in this universe yet.</p>
+            <p>Upload .txt files to begin analysis.</p>
+          </div>
+        `;
+      }
+    } else {
+      alert(`Failed to delete file: ${data.error}`);
     }
+  } catch (error) {
+    console.error("Error deleting file:", error);
+    alert("An error occurred while deleting the file.");
+  }
 }
 
-// Chat functionality
+function enableDragAndDrop() {
+  const items = document.querySelectorAll('.universe');
+  let dragSrc = null;
+
+  items.forEach(item => {
+    item.addEventListener('dragstart', function (e) {
+      dragSrc = this;
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    item.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      return false;
+    });
+
+    item.addEventListener('drop', function (e) {
+      e.stopPropagation();
+      if (dragSrc !== this) {
+        const list = document.getElementById('universe-list');
+        const filesA = document.querySelector(`[data-universe-id="${dragSrc.id}"]`);
+        const filesB = document.querySelector(`[data-universe-id="${this.id}"]`);
+
+        list.insertBefore(dragSrc, this);
+        list.insertBefore(filesA, filesB);
+      }
+      return false;
+    });
+  });
+}
+
 function sendMessage() {
-    const message = chatInput.value.trim();
-    if (message === '') return;
+  const input = document.getElementById('user-input');
+  const message = input.value.trim();
+  if (!message) return;
+  
+  const chatOutput = document.getElementById('chat-output');
+  
+  // Create user message
+  const userMsgDiv = document.createElement('div');
+  userMsgDiv.className = 'user-message';
+  userMsgDiv.innerHTML = `<span class="message-avatar">👤</span> ${message}`;
+  chatOutput.appendChild(userMsgDiv);
+  
+  // Create system response (placeholder)
+  const botMsgDiv = document.createElement('div');
+  botMsgDiv.className = 'bot-message';
+  botMsgDiv.innerHTML = `<span class="message-avatar">🤖</span> Feature under development. Try exploring the Knowledge Graph or Contradiction Report!`;
+  chatOutput.appendChild(botMsgDiv);
+  
+  // Clear input and scroll to bottom
+  input.value = '';
+  chatOutput.scrollTop = chatOutput.scrollHeight;
+}
+
+async function showKnowledgeGraph() {
+  const selectedUniverse = document.querySelector('.universe.selected');
+  
+  if (!selectedUniverse) {
+    alert("Please select a universe first.");
+    return;
+  }
+  
+  const universeId = selectedUniverse.id;
+  const universeName = selectedUniverse.textContent.trim();
+  
+  document.getElementById('chat-output').innerHTML = `
+    <div class="loading-message">
+      <p><i class="fas fa-spinner fa-spin"></i> Loading knowledge graph for ${universeName}...</p>
+    </div>
+  `;
+  
+  try {
+    const response = await fetch(`/get-knowledge-graph?universeId=${universeId}`);
+    const data = await response.json();
     
-    // Add user message to chat
-    addMessage(message, 'user');
-    chatInput.value = '';
-    
-    // Show typing indicator
-    showTypingIndicator();
-    
-    // Send to backend
-    fetch('/api/analyze', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            query_type: 'general',
-            content: message,
-            universe: document.getElementById('universeSelector').value
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        removeTypingIndicator();
-        if (data.error) {
-            addMessage(`Error: ${data.error}`, 'bot');
-        } else {
-            addMessage(data.response, 'bot');
-        }
-    })
-    .catch(error => {
-        removeTypingIndicator();
-        addMessage(`Sorry, there was an error processing your request: ${error}`, 'bot');
+    if (response.ok && data.knowledge_graph) {
+      renderKnowledgeGraph(data, universeName);
+    } else {
+      document.getElementById('chat-output').innerHTML = `
+        <div class="error-message">
+          <h3><i class="fas fa-exclamation-triangle"></i> No Knowledge Graph Available</h3>
+          <p>Upload text files to this universe to generate a knowledge graph.</p>
+        </div>
+      `;
+    }
+  } catch (error) {
+    console.error("Error loading knowledge graph:", error);
+    document.getElementById('chat-output').innerHTML = `
+      <div class="error-message">
+        <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+        <p>Failed to load knowledge graph. Please try again.</p>
+      </div>
+    `;
+  }
+}
+
+function renderKnowledgeGraph(data, universeName) {
+  const chatOutput = document.getElementById('chat-output');
+  const graphData = data.knowledge_graph;
+  
+  // Check if we have nodes and edges
+  if (!graphData.nodes || !graphData.edges || graphData.nodes.length === 0) {
+    chatOutput.innerHTML = `
+      <div class="error-message">
+        <h3><i class="fas fa-exclamation-triangle"></i> Empty Knowledge Graph</h3>
+        <p>No entities or relationships found in this universe.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  // Calculate additional statistics
+  const entityTypes = {};
+  graphData.nodes.forEach(node => {
+    if (!entityTypes[node.type]) {
+      entityTypes[node.type] = 0;
+    }
+    entityTypes[node.type]++;
+  });
+  
+  const relationshipTypes = {};
+  graphData.edges.forEach(edge => {
+    if (!relationshipTypes[edge.relationship]) {
+      relationshipTypes[edge.relationship] = 0;
+    }
+    relationshipTypes[edge.relationship]++;
+  });
+  
+  // Create container for the graph
+  chatOutput.innerHTML = `
+    <div class="graph-container">
+      <h2><i class="fas fa-brain"></i> Knowledge Graph: ${universeName}</h2>
+      
+      <div class="graph-toolbar">
+        <div class="search-wrapper">
+          <input type="text" id="node-search" placeholder="Search entities..." class="search-input">
+          <button id="search-btn" class="search-btn"><i class="fas fa-search"></i></button>
+        </div>
+        <div class="view-controls">
+          <button id="zoom-in" class="control-btn"><i class="fas fa-search-plus"></i></button>
+          <button id="zoom-out" class="control-btn"><i class="fas fa-search-minus"></i></button>
+          <button id="reset-view" class="control-btn"><i class="fas fa-sync-alt"></i></button>
+        </div>
+      </div>
+      
+      <div class="graph-info">
+        <p><strong>${graphData.nodes.length}</strong> entities and <strong>${graphData.edges.length}</strong> relationships discovered in this universe.</p>
+      </div>
+      
+      <div class="visualization-wrapper">
+        <div id="graph-canvas" class="graph-canvas"></div>
+        <div class="graph-legend">
+          ${Object.keys(entityTypes).map(type => `
+            <div class="legend-item">
+              <span class="legend-color" style="background-color: ${getNodeColor(type)};"></span>
+              <span>${type} (${entityTypes[type]})</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      
+      <div class="graph-statistics">
+        <h3><i class="fas fa-chart-pie"></i> Graph Analysis</h3>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-project-diagram"></i></div>
+            <div class="stat-value">${graphData.nodes.length}</div>
+            <div class="stat-label">Total Entities</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-link"></i></div>
+            <div class="stat-value">${graphData.edges.length}</div>
+            <div class="stat-label">Relationships</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-sitemap"></i></div>
+            <div class="stat-value">${Object.keys(entityTypes).length}</div>
+            <div class="stat-label">Entity Types</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-code-branch"></i></div>
+            <div class="stat-value">${Object.keys(relationshipTypes).length}</div>
+            <div class="stat-label">Relationship Types</div>
+          </div>
+        </div>
+        
+        <div class="detailed-stats">
+          <div class="entity-distribution">
+            <h4><i class="fas fa-tags"></i> Entity Distribution</h4>
+            <div class="distribution-bars">
+              ${Object.keys(entityTypes).map(type => `
+                <div class="distribution-item">
+                  <div class="dist-label">${type}</div>
+                  <div class="dist-bar-container">
+                    <div class="dist-bar" style="width: ${(entityTypes[type] / graphData.nodes.length * 100).toFixed(1)}%; background-color: ${getNodeColor(type)};"></div>
+                  </div>
+                  <div class="dist-value">${entityTypes[type]}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="relationship-analysis">
+            <h4><i class="fas fa-exchange-alt"></i> Top Relationships</h4>
+            <ul class="relationship-list">
+              ${getTopRelationships(relationshipTypes, 5).map(rel => `
+                <li class="relationship-item">
+                  <span class="relationship-name">${rel[0]}</span>
+                  <span class="relationship-count">${rel[1]}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        </div>
+        
+        <div class="centrality-analysis">
+          <h4><i class="fas fa-star"></i> Most Central Entities</h4>
+          <div class="centrality-list">
+            ${getTopCentralNodes(graphData, 5).map((node, idx) => `
+              <div class="centrality-item">
+                <div class="rank">#${idx + 1}</div>
+                <div class="entity-name">${node.id}</div>
+                <div class="entity-type" style="background-color: ${getNodeColor(node.type)}">${node.type}</div>
+                <div class="connections">${node.connections} connections</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Initialize the interactive graph
+  initializeInteractiveGraph(graphData, 'graph-canvas');
+  
+  // Add event listeners for the graph controls
+  document.getElementById('zoom-in').addEventListener('click', () => zoomGraph(1.2));
+  document.getElementById('zoom-out').addEventListener('click', () => zoomGraph(0.8));
+  document.getElementById('reset-view').addEventListener('click', resetGraphView);
+  document.getElementById('search-btn').addEventListener('click', searchNode);
+  document.getElementById('node-search').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') searchNode();
+  });
+}
+
+// Helper function to get node color based on type
+function getNodeColor(type) {
+  const colorMap = {
+    'Character': '#4a6cf7',
+    'Location': '#00d4d7',
+    'Object': '#ff6b6b',
+    'Event': '#ffc107',
+    'Concept': '#8e44ad',
+    'Organization': '#2ecc71'
+  };
+  
+  return colorMap[type] || '#6c757d';
+}
+
+// Helper function to get top relationships by count
+function getTopRelationships(relationshipTypes, limit) {
+  return Object.entries(relationshipTypes)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit);
+}
+
+// Helper function to calculate the most central nodes
+function getTopCentralNodes(graphData, limit) {
+  // Calculate degree centrality (number of connections)
+  const centralityScores = {};
+  
+  graphData.nodes.forEach(node => {
+    centralityScores[node.id] = {
+      id: node.id,
+      type: node.type,
+      connections: 0
+    };
+  });
+  
+  graphData.edges.forEach(edge => {
+    if (centralityScores[edge.source]) {
+      centralityScores[edge.source].connections++;
+    }
+    if (centralityScores[edge.target]) {
+      centralityScores[edge.target].connections++;
+    }
+  });
+  
+  return Object.values(centralityScores)
+    .sort((a, b) => b.connections - a.connections)
+    .slice(0, limit);
+}
+
+// Global variables for the graph visualization
+let graphSimulation;
+let graphSvg;
+let graphZoom;
+
+// Initialize the interactive D3.js graph
+function initializeInteractiveGraph(graphData, containerId) {
+  const container = document.getElementById(containerId);
+  const width = container.clientWidth;
+  const height = 500;
+  
+  // Clear any existing SVG
+  container.innerHTML = '';
+  
+  // Create SVG element
+  graphSvg = d3.select(`#${containerId}`)
+    .append('svg')
+    .attr('width', '100%')
+    .attr('height', height)
+    .attr('viewBox', `0 0 ${width} ${height}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+  
+  // Add zoom behavior
+  graphZoom = d3.zoom()
+    .scaleExtent([0.1, 4])
+    .on('zoom', (event) => {
+      graphSvg.select('g').attr('transform', event.transform);
     });
-}
-
-function addMessage(text, sender) {
-    const messageContainer = document.createElement('div');
-    messageContainer.className = 'message-container';
-    
-    const messageElement = document.createElement('div');
-    messageElement.className = sender === 'user' ? 'user-message message' : 'bot-message message';
-    messageElement.textContent = text;
-    
-    messageContainer.appendChild(messageElement);
-    chatMessages.appendChild(messageContainer);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-// Extract Elements functionality
-function extractElements() {
-    const sourceName = document.getElementById('sourceName').value;
-    const sourceType = document.getElementById('sourceType').value;
-    const content = document.getElementById('textContent').value;
-    
-    if (!sourceName || !content) {
-        alert('Please enter both source name and content');
-        return;
-    }
-    
-    document.getElementById('extractElementsBtn').disabled = true;
-    document.getElementById('extractElementsBtn').innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Extracting...';
-    
-    fetch('/api/analyze', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            query_type: 'extract_elements',
-            source_name: sourceName,
-            source_type: sourceType,
-            content: content
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('extractElementsBtn').disabled = false;
-        document.getElementById('extractElementsBtn').textContent = 'Extract Elements';
-        
-        if (data.error) {
-            alert(`Error: ${data.error}`);
-            return;
-        }
-        
-        // Show results
-        document.getElementById('noElementsMsg').style.display = 'none';
-        document.getElementById('extractedElements').style.display = 'block';
-        
-        // Display characters
-        const charactersList = document.getElementById('charactersList');
-        charactersList.innerHTML = '';
-        if (data.characters && data.characters.length > 0) {
-            data.characters.forEach(character => {
-                const characterCard = createCardElement(
-                    character.name || 'Unnamed Character',
-                    `${character.traits ? `<strong>Traits:</strong> ${character.traits}<br>` : ''}
-                    ${character.relationships ? `<strong>Relationships:</strong> ${character.relationships}` : ''}`
-                );
-                charactersList.appendChild(characterCard);
-            });
-        } else {
-            charactersList.innerHTML = '<div class="alert alert-info">No characters found</div>';
-        }
-        
-        // Display locations
-        const locationsList = document.getElementById('locationsList');
-        locationsList.innerHTML = '';
-        if (data.locations && data.locations.length > 0) {
-            data.locations.forEach(location => {
-                const locationCard = createCardElement(
-                    location.name || 'Unnamed Location',
-                    location.description || 'No description available'
-                );
-                locationsList.appendChild(locationCard);
-            });
-        } else {
-            locationsList.innerHTML = '<div class="alert alert-info">No locations found</div>';
-        }
-        
-        // Display timeline events
-        const eventsList = document.getElementById('eventsList');
-        eventsList.innerHTML = '';
-        if (data.timeline_events && data.timeline_events.length > 0) {
-            data.timeline_events.forEach(event => {
-                const eventCard = createCardElement(
-                    event.event || 'Unnamed Event',
-                    event.time_reference || 'No time reference available'
-                );
-                eventsList.appendChild(eventCard);
-            });
-        } else {
-            eventsList.innerHTML = '<div class="alert alert-info">No timeline events found</div>';
-        }
-        
-        // Display world rules
-        const rulesList = document.getElementById('rulesList');
-        rulesList.innerHTML = '';
-        if (data.world_rules && data.world_rules.length > 0) {
-            data.world_rules.forEach(rule => {
-                const ruleCard = createCardElement(
-                    rule.rule_name || 'Unnamed Rule',
-                    rule.description || 'No description available'
-                );
-                rulesList.appendChild(ruleCard);
-            });
-        } else {
-            rulesList.innerHTML = '<div class="alert alert-info">No world rules found</div>';
-        }
-        
-        // Update character options for contradiction detection
-        loadCharacterOptions();
-        
-        // Update element options for knowledge graph
-        populateElementSelect();
-    })
-    .catch(error => {
-        document.getElementById('extractElementsBtn').disabled = false;
-        document.getElementById('extractElementsBtn').textContent = 'Extract Elements';
-        alert(`Error: ${error}`);
+  
+  graphSvg.call(graphZoom);
+  
+  // Add a group for all the graph elements
+  const g = graphSvg.append('g');
+  
+  // Add arrow markers for edges
+  graphSvg.append('defs').append('marker')
+    .attr('id', 'arrowhead')
+    .attr('viewBox', '0 -5 10 10')
+    .attr('refX', 30)
+    .attr('refY', 0)
+    .attr('orient', 'auto')
+    .attr('markerWidth', 6)
+    .attr('markerHeight', 6)
+    .append('path')
+    .attr('d', 'M0,-5L10,0L0,5')
+    .attr('fill', '#999');
+  
+  // Create the links (edges)
+  const links = g.selectAll('.link')
+    .data(graphData.edges)
+    .enter().append('g')
+    .attr('class', 'link-group');
+  
+  const lines = links.append('line')
+    .attr('class', 'link')
+    .attr('stroke', '#999')
+    .attr('stroke-opacity', 0.6)
+    .attr('stroke-width', 2)
+    .attr('marker-end', 'url(#arrowhead)');
+  
+  // Add relationship labels to edges
+  links.append('text')
+    .attr('class', 'link-label')
+    .attr('font-size', '10px')
+    .attr('fill', '#555')
+    .attr('text-anchor', 'middle')
+    .attr('dy', -5)
+    .text(d => d.relationship);
+  
+  // Create the nodes
+  const nodes = g.selectAll('.node')
+    .data(graphData.nodes)
+    .enter().append('g')
+    .attr('class', 'node-group')
+    .call(d3.drag()
+      .on('start', dragstarted)
+      .on('drag', dragged)
+      .on('end', dragended));
+  
+  // Add circles for nodes
+  nodes.append('circle')
+    .attr('class', 'node')
+    .attr('r', 20)
+    .attr('fill', d => getNodeColor(d.type))
+    .attr('stroke', '#fff')
+    .attr('stroke-width', 2);
+  
+  // Add node labels
+  nodes.append('text')
+    .attr('class', 'node-label')
+    .attr('text-anchor', 'middle')
+    .attr('dy', 30)
+    .attr('font-size', '12px')
+    .attr('fill', '#333')
+    .text(d => d.id);
+  
+  // Add tooltips on hover
+  nodes.append('title')
+    .text(d => `${d.id} (${d.type})`);
+  
+  // Create the force simulation
+  graphSimulation = d3.forceSimulation(graphData.nodes)
+    .force('link', d3.forceLink(graphData.edges).id(d => d.id).distance(150))
+    .force('charge', d3.forceManyBody().strength(-400))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('collision', d3.forceCollide().radius(40))
+    .on('tick', () => {
+      // Update positions on tick
+      lines
+        .attr('x1', d => d.source.x)
+        .attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x)
+        .attr('y2', d => d.target.y);
+      
+      links.select('text')
+        .attr('x', d => (d.source.x + d.target.x) / 2)
+        .attr('y', d => (d.source.y + d.target.y) / 2);
+      
+      nodes.attr('transform', d => `translate(${d.x}, ${d.y})`);
     });
+  
+  // Functions for node dragging
+  function dragstarted(event, d) {
+    if (!event.active) graphSimulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+  
+  function dragged(event, d) {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+  
+  function dragended(event, d) {
+    if (!event.active) graphSimulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
+  
+  // Reset view initially
+  resetGraphView();
 }
 
-function createCardElement(title, bodyContent) {
-    const card = document.createElement('div');
-    card.className = 'card mb-3 data-card';
-    
-    const cardBody = document.createElement('div');
-    cardBody.className = 'card-body';
-    
-    const cardTitle = document.createElement('h6');
-    cardTitle.className = 'card-title';
-    cardTitle.textContent = title;
-    
-    const cardText = document.createElement('div');
-    cardText.className = 'card-text small';
-    cardText.innerHTML = bodyContent;
-    
-    cardBody.appendChild(cardTitle);
-    cardBody.appendChild(cardText);
-    card.appendChild(cardBody);
-    
-    return card;
+// Zoom in or out of the graph
+function zoomGraph(scaleFactor) {
+  graphSvg.transition()
+    .duration(500)
+    .call(graphZoom.scaleBy, scaleFactor);
 }
 
-// Find Contradictions functionality
-function loadCharacterOptions() {
-    // This would fetch characters from the knowledge graph in a real implementation
-    fetch('/api/knowledge_graph')
-        .then(response => response.json())
-        .then(data => {
-            const characterSelect = document.getElementById('characterSelect');
-            characterSelect.innerHTML = '<option value="">Select a character...</option>';
-            
-            // Simulate characters in knowledge graph
-            if (data.element_types && data.element_types.character > 0) {
-                // This is a placeholder - in a real implementation, we would use actual character data
-                const dummyCharacters = [
-                    { id: 'char_1', name: 'Character 1' },
-                    { id: 'char_2', name: 'Character 2' },
-                    { id: 'char_3', name: 'Character 3' }
-                ];
-                
-                dummyCharacters.forEach(character => {
-                    const option = document.createElement('option');
-                    option.value = character.id;
-                    option.textContent = character.name;
-                    characterSelect.appendChild(option);
-                });
-            }
-        })
-        .catch(error => console.error('Error loading character options:', error));
+// Reset the graph view to fit all nodes
+function resetGraphView() {
+  const container = document.getElementById('graph-canvas');
+  const width = container.clientWidth;
+  const height = 500;
+  
+  graphSvg.transition()
+    .duration(750)
+    .call(graphZoom.transform, d3.zoomIdentity
+      .translate(width / 2, height / 2)
+      .scale(0.8));
 }
 
-function findContradictions() {
-    const contradictionType = document.getElementById('contradictionType').value;
-    const character = document.getElementById('characterSelect').value;
-    
-    // Hide character select for world_rules only
-    document.getElementById('characterSelectDiv').style.display = 
-        (contradictionType === 'world_rules') ? 'none' : 'block';
-    
-    if (contradictionType === 'character' && !character) {
-        alert('Please select a character');
-        return;
+// Search for a node in the graph
+function searchNode() {
+  const searchTerm = document.getElementById('node-search').value.toLowerCase();
+  
+  if (!searchTerm) return;
+  
+  // Find the node with the matching ID
+  const nodes = d3.selectAll('.node-group');
+  let found = false;
+  
+  nodes.each(function(d) {
+    if (d.id.toLowerCase().includes(searchTerm)) {
+      // Highlight the found node
+      d3.select(this).select('circle')
+        .transition()
+        .duration(300)
+        .attr('r', 30)
+        .attr('stroke', '#ff6b6b')
+        .attr('stroke-width', 4);
+      
+      // Center the view on the found node
+      graphSvg.transition()
+        .duration(750)
+        .call(graphZoom.transform, d3.zoomIdentity
+          .translate(document.getElementById('graph-canvas').clientWidth / 2 - d.x, 250 - d.y)
+          .scale(1.2));
+      
+      found = true;
+      
+      // Reset the highlighting after a delay
+      setTimeout(() => {
+        d3.select(this).select('circle')
+          .transition()
+          .duration(300)
+          .attr('r', 20)
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 2);
+      }, 3000);
     }
-    
-    document.getElementById('findContradictionsBtn').disabled = true;
-    document.getElementById('findContradictionsBtn').innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Analyzing...';
-    
-    fetch('/api/analyze', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            query_type: 'detect_contradictions',
-            content: character
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('findContradictionsBtn').disabled = false;
-        document.getElementById('findContradictionsBtn').textContent = 'Find Contradictions';
-        
-        document.getElementById('noContradictionsMsg').style.display = 'none';
-        document.getElementById('contradictionResults').style.display = 'block';
-        
-        // Display character contradictions
-        const characterContradictions = document.getElementById('characterContradictions');
-        characterContradictions.innerHTML = '';
-        
-        if (data.character_contradictions && data.character_contradictions.length > 0) {
-            data.character_contradictions.forEach(contradiction => {
-                const card = document.createElement('div');
-                card.className = 'card contradiction-card mb-3';
-                
-                const cardBody = document.createElement('div');
-                cardBody.className = 'card-body';
-                
-                const description = document.createElement('p');
-                description.textContent = contradiction.description;
-                
-                const resolution = document.createElement('div');
-                resolution.className = 'mt-2';
-                resolution.innerHTML = '<strong>Possible Resolutions:</strong>';
-                
-                const resolutionList = document.createElement('ul');
-                contradiction.resolution_options.forEach(option => {
-                    const item = document.createElement('li');
-                    item.textContent = option;
-                    resolutionList.appendChild(item);
-                });
-                
-                resolution.appendChild(resolutionList);
-                cardBody.appendChild(description);
-                cardBody.appendChild(resolution);
-                card.appendChild(cardBody);
-                
-                characterContradictions.appendChild(card);
-            });
-        } else {
-            characterContradictions.innerHTML = '<div class="alert alert-info">No character timeline contradictions found</div>';
-        }
-        
-        // Display rule contradictions
-        const ruleContradictions = document.getElementById('ruleContradictions');
-        ruleContradictions.innerHTML = '';
-        
-        if (data.rule_contradictions && data.rule_contradictions.length > 0) {
-            data.rule_contradictions.forEach(contradiction => {
-                const card = document.createElement('div');
-                card.className = 'card contradiction-card mb-3';
-                
-                const cardBody = document.createElement('div');
-                cardBody.className = 'card-body';
-                
-                const description = document.createElement('p');
-                description.textContent = contradiction.description;
-                
-                const resolution = document.createElement('div');
-                resolution.className = 'mt-2';
-                resolution.innerHTML = '<strong>Possible Resolutions:</strong>';
-                
-                const resolutionList = document.createElement('ul');
-                contradiction.resolution_options.forEach(option => {
-                    const item = document.createElement('li');
-                    item.textContent = option;
-                    resolutionList.appendChild(item);
-                });
-                
-                resolution.appendChild(resolutionList);
-                cardBody.appendChild(description);
-                cardBody.appendChild(resolution);
-                card.appendChild(cardBody);
-                
-                ruleContradictions.appendChild(card);
-            });
-        } else {
-            ruleContradictions.innerHTML = '<div class="alert alert-info">No world rule contradictions found</div>';
-        }
-    })
-    .catch(error => {
-        document.getElementById('findContradictionsBtn').disabled = false;
-        document.getElementById('findContradictionsBtn').textContent = 'Find Contradictions';
-        alert(`Error: ${error}`);
+  });
+  
+  if (!found) {
+    // Flash the search box to indicate no results
+    const searchInput = document.getElementById('node-search');
+    searchInput.classList.add('search-no-results');
+    setTimeout(() => {
+      searchInput.classList.remove('search-no-results');
+    }, 500);
+  }
+}
+
+// Helper function to count node types
+function countNodeTypes(nodes, type) {
+  return nodes.filter(node => node.type === type).length;
+}
+
+// Updated renderContradictionReport function with improved styling
+function renderContradictionReport(data, universeName) {
+  const chatOutput = document.getElementById('chat-output');
+  const contradictions = data.contradictions || [];
+  const speculationBoundaries = data.speculation_boundaries || [];
+  
+  // Create HTML for contradictions
+  let contradictionsHTML = '';
+  if (contradictions.length > 0) {
+    contradictionsHTML = `
+      <div class="contradictions-section">
+        <h3><i class="fas fa-exclamation-triangle"></i> Contradictions Found (${contradictions.length})</h3>
+        <div class="contradictions-list">
+          ${contradictions.map((c, i) => `
+            <div class="contradiction-item">
+              <div class="contradiction-header">
+                <span class="contradiction-number">Contradiction #${i+1}</span>
+                <span class="contradiction-confidence">Confidence: ${(c.confidence * 100).toFixed(0)}%</span>
+              </div>
+              <div class="contradiction-statements">
+                <p class="statement statement-1">"${c.conflicting_statements[0]}"</p>
+                <div class="contradiction-vs">VS</div>
+                <p class="statement statement-2">"${c.conflicting_statements[1]}"</p>
+              </div>
+              <div class="contradiction-description">
+                <p><strong>Analysis:</strong> ${c.description}</p>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } else {
+    contradictionsHTML = `
+      <div class="contradictions-section empty">
+        <h3><i class="fas fa-check-circle"></i> No Contradictions Found</h3>
+        <p>The statements in this universe are consistent with each other.</p>
+      </div>
+    `;
+  }
+  
+  // Create HTML for speculation boundaries
+  let speculationHTML = '';
+  if (speculationBoundaries.length > 0) {
+    // Group by category
+    const groupedSpeculations = {};
+    speculationBoundaries.forEach(item => {
+      if (!groupedSpeculations[item.category]) {
+        groupedSpeculations[item.category] = [];
+      }
+      groupedSpeculations[item.category].push(item);
     });
-}
-
-// Fact Check functionality
-function checkFact() {
-    const universe = document.getElementById('universeForFactCheck').value;
-    const statement = document.getElementById('factCheckStatement').value;
     
-    if (!universe || !statement) {
-        alert('Please select a universe and enter a statement');
-        return;
+    speculationHTML = `
+      <div class="speculation-section">
+        <h3><i class="fas fa-lightbulb"></i> Speculation Analysis</h3>
+        <div class="speculation-categories">
+          ${Object.keys(groupedSpeculations).map(category => `
+            <div class="speculation-category ${category.toLowerCase()}">
+              <h4>${category} Statements (${groupedSpeculations[category].length})</h4>
+              <ul class="speculation-list">
+                ${groupedSpeculations[category].map(item => `
+                  <li class="speculation-item">
+                    <span class="confidence-indicator" style="width: ${item.confidence * 100}%"></span>
+                    <span class="speculation-text">"${item.element}"</span>
+                    <span class="speculation-confidence">${(item.confidence * 100).toFixed(0)}%</span>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } else {
+    speculationHTML = `
+      <div class="speculation-section empty">
+        <h3><i class="fas fa-question-circle"></i> No Speculation Analysis Available</h3>
+        <p>Add more content to generate speculation boundaries.</p>
+      </div>
+    `;
+  }
+  
+  // Combine everything with additional stats section
+  chatOutput.innerHTML = `
+    <div class="contradiction-report">
+      <h2><i class="fas fa-file-alt"></i> Universe Analysis: ${universeName}</h2>
+      
+      <div class="report-summary">
+        <div class="summary-card ${contradictions.length > 0 ? 'has-issues' : 'no-issues'}">
+          <div class="summary-icon">
+            <i class="${contradictions.length > 0 ? 'fas fa-exclamation-circle' : 'fas fa-check-circle'}"></i>
+          </div>
+          <div class="summary-content">
+            <div class="summary-title">${contradictions.length} Contradiction${contradictions.length !== 1 ? 's' : ''}</div>
+            <div class="summary-description">
+              ${contradictions.length > 0 ? 'Logical conflicts detected' : 'No logical conflicts found'}
+            </div>
+          </div>
+        </div>
+        
+        <div class="summary-card">
+          <div class="summary-icon">
+            <i class="fas fa-lightbulb"></i>
+          </div>
+          <div class="summary-content">
+            <div class="summary-title">${speculationBoundaries.length} Speculation Elements</div>
+            <div class="summary-description">
+              Elements analyzed for factuality
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      ${contradictionsHTML}
+      ${speculationHTML}
+    </div>
+  `;
+}
+function drawGraph(graphData, containerId) {
+  // This is a placeholder for D3.js code
+  // In a real implementation, you would use D3.js to draw the graph
+  
+  const container = document.getElementById(containerId);
+  
+  // For now, we'll create a simple SVG visualization
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '500');
+  svg.setAttribute('viewBox', '0 0 800 500');
+  
+  // Create a simple force-directed graph layout
+  const nodeRadius = 40;
+  const width = 800;
+  const height = 500;
+  
+  // Position nodes in a circle
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = Math.min(width, height) / 2 - nodeRadius * 2;
+  
+  // Add nodes
+  graphData.nodes.forEach((node, i) => {
+    const angle = (i / graphData.nodes.length) * 2 * Math.PI;
+    const x = centerX + radius * Math.cos(angle);
+    const y = centerY + radius * Math.sin(angle);
+    
+    // Node color based on type
+    let color;
+    switch(node.type) {
+      case 'Character': color = '#4a6cf7'; break;
+      case 'Location': color = '#00d4d7'; break;
+      case 'Object': color = '#ff6b6b'; break;
+      default: color = '#6c757d';
     }
     
-    document.getElementById('checkFactBtn').disabled = true;
-    document.getElementById('checkFactBtn').innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Checking...';
+    // Create node circle
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', x);
+    circle.setAttribute('cy', y);
+    circle.setAttribute('r', nodeRadius);
+    circle.setAttribute('fill', color);
+    circle.setAttribute('stroke', '#fff');
+    circle.setAttribute('stroke-width', '2');
     
-    fetch('/api/analyze', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            query_type: 'fact_check',
-            content: statement,
-            universe: universe === 'custom' ? document.getElementById('customUniverse').value : universe
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('checkFactBtn').disabled = false;
-        document.getElementById('checkFactBtn').textContent = 'Check Statement';
-        
-        document.getElementById('noFactCheckMsg').style.display = 'none';
-        document.getElementById('factCheckResults').style.display = 'block';
-        
-        // Update status badge
-        const statusBadge = document.getElementById('statusBadge');
-        statusBadge.textContent = data.status.toUpperCase();
-        statusBadge.className = `status-badge status-${data.status.toLowerCase()}`;
-        
-        // Update confidence
-        document.getElementById('confidenceDisplay').textContent = `Confidence: ${(data.confidence * 100).toFixed(0)}%`;
-        
-        // Update explanation
-        document.getElementById('explanationText').textContent = data.explanation;
-        
-        // Mock related elements (would be real data in production)
-        const relatedElements = document.getElementById('relatedElements');
-        relatedElements.innerHTML = '';
-        
-        // Simulate related elements
-        const mockElements = [
-            { type: 'character', name: 'Related Character', confidence: 0.9 },
-            { type: 'location', name: 'Related Location', confidence: 0.7 },
-            { type: 'world_rule', name: 'Related Rule', confidence: 0.8 }
-        ];
-        
-        mockElements.forEach(element => {
-            const badge = document.createElement('span');
-            badge.className = 'badge bg-secondary me-2 mb-2';
-            
-            let icon = '';
-            switch(element.type) {
-                case 'character': icon = '<i class="fas fa-user me-1"></i>'; break;
-                case 'location': icon = '<i class="fas fa-map-marker-alt me-1"></i>'; break;
-                case 'timeline_event': icon = '<i class="fas fa-calendar me-1"></i>'; break;
-                case 'world_rule': icon = '<i class="fas fa-book me-1"></i>'; break;
-            }
-            
-            badge.innerHTML = `${icon}${element.name} (${(element.confidence * 100).toFixed(0)}%)`;
-            relatedElements.appendChild(badge);
-        });
-    })
-    .catch(error => {
-        document.getElementById('checkFactBtn').disabled = false;
-        document.getElementById('checkFactBtn').textContent = 'Check Statement';
-        alert(`Error: ${error}`);
+    // Add node label
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', x);
+    text.setAttribute('y', y);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('fill', '#ffffff');
+    text.setAttribute('font-size', '12');
+    text.textContent = node.id;
+    
+    // Add node to SVG
+    svg.appendChild(circle);
+    svg.appendChild(text);
+    
+    // Store node position for edges
+    node.x = x;
+    node.y = y;
+  });
+  
+  // Add edges
+  graphData.edges.forEach(edge => {
+    const source = graphData.nodes.find(n => n.id === edge.source);
+    const target = graphData.nodes.find(n => n.id === edge.target);
+    
+    if (source && target) {
+      // Create edge line
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', source.x);
+      line.setAttribute('y1', source.y);
+      line.setAttribute('x2', target.x);
+      line.setAttribute('y2', target.y);
+      line.setAttribute('stroke', '#6c757d');
+      line.setAttribute('stroke-width', '2');
+      line.setAttribute('stroke-opacity', '0.6');
+      
+      // Add relationship label
+      const midX = (source.x + target.x) / 2;
+      const midY = (source.y + target.y) / 2;
+      
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', midX);
+      text.setAttribute('y', midY);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('fill', '#333');
+      text.setAttribute('font-size', '10');
+      text.setAttribute('font-weight', 'bold');
+      text.setAttribute('background', '#fff');
+      text.textContent = edge.relationship;
+      
+      // Add edge components to SVG
+      svg.appendChild(line);
+      svg.appendChild(text);
+    }
+  });
+  
+  container.appendChild(svg);
+}
+
+async function showContradictionReport() {
+  const selectedUniverse = document.querySelector('.universe.selected');
+  
+  if (!selectedUniverse) {
+    alert("Please select a universe first.");
+    return;
+  }
+  
+  const universeId = selectedUniverse.id;
+  const universeName = selectedUniverse.textContent.trim();
+  
+  document.getElementById('chat-output').innerHTML = `
+    <div class="loading-message">
+      <p><i class="fas fa-spinner fa-spin"></i> Analyzing contradictions in ${universeName}...</p>
+    </div>
+  `;
+  
+  try {
+    const response = await fetch(`/get-contradictions?universeId=${universeId}`);
+    const data = await response.json();
+    
+    if (response.ok) {
+      renderContradictionReport(data, universeName);
+    } else {
+      document.getElementById('chat-output').innerHTML = `
+        <div class="error-message">
+          <h3><i class="fas fa-exclamation-triangle"></i> No Contradiction Report Available</h3>
+          <p>Upload text files to this universe to generate a contradiction report.</p>
+        </div>
+      `;
+    }
+  } catch (error) {
+    console.error("Error loading contradictions:", error);
+    document.getElementById('chat-output').innerHTML = `
+      <div class="error-message">
+        <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+        <p>Failed to load contradiction report. Please try again.</p>
+      </div>
+    `;
+  }
+}
+
+function renderContradictionReport(data, universeName) {
+  const chatOutput = document.getElementById('chat-output');
+  const contradictions = data.contradictions || [];
+  const speculationBoundaries = data.speculation_boundaries || [];
+  
+  // Create HTML for contradictions
+  let contradictionsHTML = '';
+  if (contradictions.length > 0) {
+    contradictionsHTML = `
+      <div class="contradictions-section">
+        <h3><i class="fas fa-exclamation-triangle"></i> Contradictions Found (${contradictions.length})</h3>
+        <div class="contradictions-list">
+          ${contradictions.map((c, i) => `
+            <div class="contradiction-item">
+              <div class="contradiction-header">
+                <span class="contradiction-number">#${i+1}</span>
+                <span class="contradiction-confidence">Confidence: ${(c.confidence * 100).toFixed(0)}%</span>
+              </div>
+              <div class="contradiction-statements">
+                <p class="statement statement-1">"${c.conflicting_statements[0]}"</p>
+                <div class="contradiction-vs">VS</div>
+                <p class="statement statement-2">"${c.conflicting_statements[1]}"</p>
+              </div>
+              <div class="contradiction-description">
+                <p><strong>Analysis:</strong> ${c.description}</p>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } else {
+    contradictionsHTML = `
+      <div class="contradictions-section empty">
+        <h3><i class="fas fa-check-circle"></i> No Contradictions Found</h3>
+        <p>The statements in this universe are consistent with each other.</p>
+      </div>
+    `;
+  }
+  
+  // Create HTML for speculation boundaries
+  let speculationHTML = '';
+  if (speculationBoundaries.length > 0) {
+    // Group by category
+    const groupedSpeculations = {};
+    speculationBoundaries.forEach(item => {
+      if (!groupedSpeculations[item.category]) {
+        groupedSpeculations[item.category] = [];
+      }
+      groupedSpeculations[item.category].push(item);
     });
-}
-
-// Knowledge Graph functionality
-function populateElementSelect() {
-    fetch('/api/knowledge_graph')
-        .then(response => response.json())
-        .then(data => {
-            const elementSelect = document.getElementById('elementSelect');
-            elementSelect.innerHTML = '<option value="">Select an element...</option>';
-            
-            // Update graph statistics
-            document.getElementById('nodeCount').textContent = data.node_count || 0;
-            document.getElementById('edgeCount').textContent = data.edge_count || 0;
-            document.getElementById('charCount').textContent = data.element_types?.character || 0;
-            document.getElementById('locCount').textContent = data.element_types?.location || 0;
-            document.getElementById('eventCount').textContent = data.element_types?.timeline_event || 0;
-            document.getElementById('ruleCount').textContent = data.element_types?.world_rule || 0;
-            
-            // For demonstration, add mock elements
-            if (data.node_count > 0) {
-                const mockElements = [
-                    { id: 'char_1', type: 'character', name: 'Character 1' },
-                    { id: 'char_2', type: 'character', name: 'Character 2' },
-                    { id: 'loc_1', type: 'location', name: 'Location 1' },
-                    { id: 'event_1', type: 'timeline_event', name: 'Event 1' },
-                    { id: 'rule_1', type: 'world_rule', name: 'Rule 1' }
-                ];
-                
-                mockElements.forEach(element => {
-                    const option = document.createElement('option');
-                    option.value = element.id;
-                    
-                    let icon = '';
-                    switch(element.type) {
-                        case 'character': icon = '👤 '; break;
-                        case 'location': icon = '📍 '; break;
-                        case 'timeline_event': icon = '📅 '; break;
-                        case 'world_rule': icon = '📜 '; break;
-                    }
-                    
-                    option.textContent = `${icon}${element.name}`;
-                    elementSelect.appendChild(option);
-                });
-            }
-        })
-        .catch(error => console.error('Error loading elements:', error));
-}
-
-function loadKnowledgeGraphStats() {
-    fetch('/api/knowledge_graph')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('nodeCount').textContent = data.node_count || 0;
-            document.getElementById('edgeCount').textContent = data.edge_count || 0;
-            document.getElementById('charCount').textContent = data.element_types?.character || 0;
-            document.getElementById('locCount').textContent = data.element_types?.location || 0;
-            document.getElementById('eventCount').textContent = data.element_types?.timeline_event || 0;
-            document.getElementById('ruleCount').textContent = data.element_types?.world_rule || 0;
-        })
-        .catch(error => console.error('Error loading graph stats:', error));
-}
-
-function updateGraph() {
-    const elementId = document.getElementById('elementSelect').value;
-    const depth = document.getElementById('depthSlider').value;
     
-    if (!elementId) {
-        alert('Please select an element');
-        return;
+    speculationHTML = `
+      <div class="speculation-section">
+        <h3><i class="fas fa-lightbulb"></i> Speculation Analysis</h3>
+        <div class="speculation-categories">
+          ${Object.keys(groupedSpeculations).map(category => `
+            <div class="speculation-category ${category.toLowerCase()}">
+              <h4>${category} Statements (${groupedSpeculations[category].length})</h4>
+              <ul class="speculation-list">
+                ${groupedSpeculations[category].map(item => `
+                  <li class="speculation-item">
+                    <span class="confidence-indicator" style="width: ${item.confidence * 100}%"></span>
+                    <span class="speculation-text">"${item.element}"</span>
+                    <span class="speculation-confidence">${(item.confidence * 100).toFixed(0)}%</span>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } else {
+    speculationHTML = `
+      <div class="speculation-section empty">
+        <h3><i class="fas fa-question-circle"></i> No Speculation Analysis Available</h3>
+        <p>Add more content to generate speculation boundaries.</p>
+      </div>
+    `;
+  }
+  
+  // Combine everything
+  chatOutput.innerHTML = `
+    <div class="contradiction-report">
+      <h2><i class="fas fa-file-alt"></i> Contradiction Report: ${universeName}</h2>
+      ${contradictionsHTML}
+      ${speculationHTML}
+    </div>
+  `;
+}
+
+// Handle file uploads and processing
+document.getElementById('file-upload').addEventListener('change', handleFileUpload);
+
+async function handleFileUpload(event) {
+  const fileList = event.target.files;
+  const selectedUniverse = document.querySelector('.universe.selected');
+  
+  if (!selectedUniverse) {
+    alert("Please select a universe to upload files to.");
+    return;
+  }
+  
+  const universeId = selectedUniverse.id;
+  
+  for (let i = 0; i < fileList.length; i++) {
+    const file = fileList[i];
+    
+    if (!file.name.endsWith('.txt')) {
+      alert(`Only .txt files are supported. Skipping ${file.name}`);
+      continue;
     }
     
-    document.getElementById('updateGraphBtn').disabled = true;
-    document.getElementById('updateGraphBtn').innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
-    
-    fetch(`/api/knowledge_graph?element_id=${elementId}&depth=${depth}`)
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('updateGraphBtn').disabled = false;
-            document.getElementById('updateGraphBtn').textContent = 'Update Graph';
-            
-            document.getElementById('noGraphDataMsg').style.display = 'none';
-            
-            // This is just a mock visualization
-            // In a real implementation, you would use a library like D3.js or Cytoscape.js
-            
-            const graphDiv = document.getElementById('knowledgeGraph');
-            graphDiv.innerHTML = `<div class="alert alert-success">
-                <i class="fas fa-check-circle"></i> Graph loaded with ${data.nodes?.length || 0} nodes and ${data.edges?.length || 0} edges
-                <p class="mt-3">In a real implementation, this would be an interactive visualization using D3.js or a similar library.</p>
-            </div>`;
-            
-            // Show mock element details
-            document.getElementById('elementDetails').style.display = 'block';
-            document.getElementById('selectedElementName').textContent = `Selected: ${document.getElementById('elementSelect').options[document.getElementById('elementSelect').selectedIndex].text}`;
-            
-            const detailsDiv = document.getElementById('selectedElementDetails');
-            detailsDiv.innerHTML = `
-                <p><strong>ID:</strong> ${elementId}</p>
-                <p><strong>Connections:</strong> ${data.edges?.length || 0}</p>
-                <p><strong>Confidence:</strong> 85%</p>
-                <p><strong>Sources:</strong> Primary Novel, Author Statements</p>
-            `;
-        })
-        .catch(error => {
-            document.getElementById('updateGraphBtn').disabled = false;
-            document.getElementById('updateGraphBtn').textContent = 'Update Graph';
-            alert(`Error: ${error}`);
-        });
-}
-
-// Open Questions functionality
-function findOpenQuestions() {
-    const universeSelect = document.getElementById('universeForQuestions');
-    const universe = universeSelect.value;
-    
-    if (!universe) {
-        alert('Please select a universe');
-        return;
-    }
-    
-    const universeName = universe === 'custom' ? 
-        document.getElementById('customUniverse').value : 
-        universeSelect.options[universeSelect.selectedIndex].text;
-    
-    document.getElementById('findQuestionsBtn').disabled = true;
-    document.getElementById('findQuestionsBtn').innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Analyzing...';
-    
-    fetch('/api/analyze', {
+    try {
+      const formData = new FormData();
+      formData.append('universeId', universeId);
+      formData.append('file', file);
+      
+      const response = await fetch('/upload-file', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            query_type: 'open_questions',
-            universe: universe === 'custom' ? document.getElementById('customUniverse').value : universe
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('findQuestionsBtn').disabled = false;
-        document.getElementById('findQuestionsBtn').textContent = 'Find Open Questions';
-        
-        document.getElementById('noQuestionsMsg').style.display = 'none';
-        document.getElementById('openQuestionsList').style.display = 'block';
-        
-        const questionsList = document.getElementById('openQuestionsList');
-        questionsList.innerHTML = '';
-        
-        if (data.length > 0) {
-            data.forEach(question => {
-                const card = document.createElement('div');
-                card.className = 'card mb-3';
-                
-                const cardHeader = document.createElement('div');
-                cardHeader.className = 'card-header d-flex justify-content-between align-items-center';
-                
-                const title = document.createElement('h6');
-                title.className = 'mb-0';
-                title.textContent = question.question;
-                
-                const badge = document.createElement('span');
-                badge.className = `badge ${getSpeculationBadgeClass(question.speculation_potential)}`;
-                badge.textContent = `Speculation: ${question.speculation_potential}`;
-                
-                cardHeader.appendChild(title);
-                cardHeader.appendChild(badge);
-                
-                const cardBody = document.createElement('div');
-                cardBody.className = 'card-body';
-                
-                const impact = document.createElement('p');
-                impact.innerHTML = `<strong>Narrative Impact:</strong> ${question.narrative_impact}`;
-                
-                const relatedElements = document.createElement('div');
-                relatedElements.className = 'mt-2';
-                relatedElements.innerHTML = '<strong>Related Elements:</strong> ';
-                
-                question.related_elements.forEach((element, index) => {
-                    const elementBadge = document.createElement('span');
-                    elementBadge.className = 'badge bg-secondary me-1';
-                    elementBadge.textContent = element;
-                    relatedElements.appendChild(elementBadge);
-                });
-                
-                cardBody.appendChild(impact);
-                cardBody.appendChild(relatedElements);
-                
-                card.appendChild(cardHeader);
-                card.appendChild(cardBody);
-                
-                questionsList.appendChild(card);
-            });
-        } else {
-            questionsList.innerHTML = '<div class="alert alert-info">No open questions found for this universe</div>';
-        }
-    })
-    .catch(error => {
-        document.getElementById('findQuestionsBtn').disabled = false;
-        document.getElementById('findQuestionsBtn').textContent = 'Find Open Questions';
-        alert(`Error: ${error}`);
-    });
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh the file list
+        await handleUniverseClick(universeId);
+      } else {
+        alert(`Failed to upload ${file.name}: ${data.error}`);
+      }
+    } catch (error) {
+      console.error(`Error uploading ${file.name}:`, error);
+      alert(`An error occurred while uploading ${file.name}.`);
+    }
+  }
+  
+  // Clear the file input
+  event.target.value = '';
 }
 
-function getSpeculationBadgeClass(potential) {
-    switch(potential.toLowerCase()) {
-        case 'high': return 'bg-danger';
-        case 'medium': return 'bg-warning text-dark';
-        case 'low': return 'bg-info text-dark';
-        default: return 'bg-secondary';
-    }
-}
-
-// Search Datasets functionality
-function searchDatasets() {
-    const query = document.getElementById('datasetQuery').value;
-    
-    if (!query) {
-        alert('Please enter a search query');
-        return;
-    }
-    
-    document.getElementById('searchDatasetsBtn').disabled = true;
-    document.getElementById('search
+// Initialize the app when the DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize any required components
+});
