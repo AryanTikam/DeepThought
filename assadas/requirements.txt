@@ -1,5 +1,0 @@
-Flask
-spacy
-langchain
-langchain-google-genai
-google-generativeai
