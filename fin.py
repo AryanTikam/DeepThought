@@ -266,9 +266,20 @@ class StoryVectorDatabase:
             if contra["file_id"] != file_id
         ]
 
+        # Remove resolutions associated with the file
+        self.metadata["potential_contradictions"] = [
+            {
+                "file_id": contra["file_id"],
+                "contradictions": contra["contradictions"],
+                "resolution": contra["resolution"],
+            }
+            for contra in self.metadata["potential_contradictions"]
+            if contra["file_id"] != file_id
+        ]
+        self._reconcile_story_information()
+        # Save updated metadata
         self._save_metadata()
 
-    # Rest of the class methods remain unchanged
     def _extract_story_info(self, text: str, file_id: str):
         """Extract key information from the story using LLM."""
         llm = get_llm()
@@ -284,9 +295,9 @@ class StoryVectorDatabase:
         
         CHARACTERS:
         """
-
         character_response = llm.invoke(character_prompt)
         character_str = _extract_content_from_response(character_response)
+
         # Extract timeline events
         timeline_prompt = f"""
         Analyze the following story text and extract a chronological timeline of key events.
@@ -297,33 +308,49 @@ class StoryVectorDatabase:
         
         TIMELINE:
         """
-
         timeline_response = llm.invoke(timeline_prompt)
         timeline_str = _extract_content_from_response(timeline_response)
+
         # Look for potential contradictions
         contradiction_prompt = f"""
         Analyze the following story text and identify any potential contradictions or inconsistencies.
-        Focus on character actions, timeline conflicts, or plot holes. and mention from where they are too. 
+        Focus on character actions, timeline conflicts,logic errors or plot holes. Mention where they occur.
         
         TEXT:
         {text[:10000]}... (truncated)
         
         POTENTIAL CONTRADICTIONS:
         """
-
         contradiction_response = llm.invoke(contradiction_prompt)
         contradiction_str = _extract_content_from_response(contradiction_response)
+
+        # Resolve contradictions
+        resolution_prompt = f"""
+        Analyze the following contradictions and provide resolutions for each, if possible, if multiple possible give all with ranking.:
+        
+        CONTRADICTIONS:
+        {contradiction_str}
+        
+        RESOLUTIONS:
+        """
+        resolution_response = llm.invoke(resolution_prompt)
+        resolution_str = _extract_content_from_response(resolution_response)
+
         # Save to metadata
         self.metadata["character_info"][file_id] = character_str
         self.metadata["timeline_events"].append(
             {"file_id": file_id, "events": timeline_str}
         )
         self.metadata["potential_contradictions"].append(
-            {"file_id": file_id, "contradictions": contradiction_str}
+            {
+                "file_id": file_id,
+                "contradictions": contradiction_str,
+                "resolution": resolution_str,
+            }
         )
 
     def _reconcile_story_information(self):
-        """Reconcile information across all story files to update character identities and timeline."""
+        """Reconcile information across all story files to update character identities, timeline, and contradictions."""
         if not self.metadata["files_processed"]:
             return
 
@@ -347,10 +374,7 @@ class StoryVectorDatabase:
         
         RECONCILED CHARACTER LIST:
         """
-
         reconciled_characters = llm.invoke(character_reconcile_prompt)
-
-        # Create combined reconciled character data
         self.metadata["reconciled_characters"] = _extract_content_from_response(
             reconciled_characters
         )
@@ -373,12 +397,30 @@ class StoryVectorDatabase:
         
         UNIFIED TIMELINE:
         """
-
         unified_timeline = llm.invoke(timeline_reconcile_prompt)
-
-        # Save reconciled timeline
         self.metadata["unified_timeline"] = _extract_content_from_response(
             unified_timeline
+        )
+
+        # Reconcile contradictions
+        all_contradictions = "\n\n".join(
+            [
+                f"FILE {c['file_id']}:\n{c['contradictions']}"
+                for c in self.metadata["potential_contradictions"]
+            ]
+        )
+        contradiction_resolution_prompt = f"""
+        Review the contradictions from multiple story files below and provide a unified resolution for the overall story.
+        
+        CONTRADICTIONS:
+        {all_contradictions}
+        
+        UNIFIED RESOLUTION:
+        """
+        unified_resolution = llm.invoke(contradiction_resolution_prompt)
+        self.metadata["overall_contradictions"] = all_contradictions
+        self.metadata["overall_resolution"] = _extract_content_from_response(
+            unified_resolution
         )
 
         self._save_metadata()
@@ -448,8 +490,11 @@ class StoryVectorDatabase:
                     for c in self.metadata["potential_contradictions"]
                 ]
             )
-            context += f"\n\nPOTENTIAL CONTRADICTIONS:\n{contradictions}"
-
+            context += (
+                f"\n\nPOTENTIAL CONTRADICTIONS AND RESOLUTIONS:\n{contradictions}"
+            )
+            if "overall_resolution" in self.metadata:
+                context += f"\n\nOVERALL CONTRADICTION RESOLUTION:\n{self.metadata['overall_resolution']}"
         # Build conversation history context
         conversation_context = ""
         if use_conversation_history and self.conversation_history:
@@ -489,7 +534,8 @@ class StoryVectorDatabase:
             self.conversation_history = self.conversation_history[
                 -self.max_history_length :
             ]
-
+        # Save conversation history
+        self.save_conversation_history()
         return {"answer": answer_str, "sources": sources}
 
     def get_story_summary(self) -> str:
@@ -537,6 +583,7 @@ class StoryVectorDatabase:
         # Include character and timeline information if available
         char_info = self.metadata.get("reconciled_characters", "")
         timeline = self.metadata.get("unified_timeline", "")
+        overall_resolution = self.metadata.get("overall_resolution", "")
 
         # Add explicit instructions to use what's available
         summary_prompt = f"""
@@ -563,7 +610,7 @@ class StoryVectorDatabase:
     def save_conversation_history(self, file_path: str = None):
         """Save conversation history to a file."""
         if file_path is None:
-            file_path = f"{self.db_path}_conversation.json"
+            file_path = f"data/{self.folder_name}/{self.folder_name}_conversation.json"
 
         with open(file_path, "w") as f:
             json.dump(self.conversation_history, f, indent=2)
@@ -573,7 +620,7 @@ class StoryVectorDatabase:
     def load_conversation_history(self, file_path: str = None):
         """Load conversation history from a file."""
         if file_path is None:
-            file_path = f"{self.db_path}_conversation.json"
+            file_path = f"data/{self.folder_name}/{self.folder_name}_conversation.json"
         try:
             with open(file_path, "r") as f:
                 self.conversation_history = json.load(f)
@@ -665,7 +712,8 @@ import shutil
 
 def folder_deleted(folder_path: str):
     """Handle folder deletion event."""
-    full_path = os.path.join("data", folder_path)
+    folder_name = os.path.basename(os.path.normpath(folder_path))
+    full_path = os.path.join("data", folder_name)
     if os.path.exists(full_path):
         shutil.rmtree(full_path)
         print(f"Folder {full_path} deleted.")
@@ -692,28 +740,52 @@ def chat_bot(folder_path: str, question: str):
 
 
 def analysis(folder_path: str):
-    """output the metadata formatted correctly, load directly from path data/folder_path with file name folder_name_metadata.json"""
-    file_path = os.path.join("data", folder_path, f"{folder_path}_metadata.json")
+    """Output the metadata formatted correctly, load directly from path data/folder_path with file name folder_name_metadata.json."""
+    folder_name = os.path.basename(os.path.normpath(folder_path))
+    file_path = os.path.join("data", folder_name, f"{folder_name}_metadata.json")
+    print(f"Loading metadata from {file_path}")
     with open(file_path, "r") as f:
         metadata = json.load(f)
     formatted = {}
     for book in metadata["files_processed"]:
         formatted[book] = {}
-        # remove anything before the first \n\n*
-        formatted[book]["characters"] = metadata["character_info"][book].split("\n\n")[
-            1
-        ]
+        # Remove anything before the first \n\n*
+        _, _, characters = metadata["character_info"][book].partition("\n\n*")
+        formatted[book]["characters"] = characters
+
         for event in metadata["timeline_events"]:
             if event["file_id"] == book:
-                formatted[book]["timeline"] = event["events"].split("\n\n")[1]
+                _, _, timeline = event["events"].partition("\n\n*")
+                formatted[book]["timeline"] = timeline
                 break
+
         for contradiction in metadata["potential_contradictions"]:
             if contradiction["file_id"] == book:
-                formatted[book]["contradictions"] = contradiction[
-                    "contradictions"
-                ].split("\n\n")[1]
+                _, _, contradictions = contradiction["contradictions"].partition(
+                    "\n\n*"
+                )
+                _, _, resolution = contradiction["resolution"].partition("\n\n*")
+                formatted[book]["contradictions"] = contradictions
+                formatted[book]["resolution"] = resolution
                 break
-    formatted["timeline"] = metadata["unified_timeline"].split("\n\n")[1]
+
+    # Add overall reconciled data
+    _, _, character_revelations = metadata.get("reconciled_characters", "").partition(
+        "\n\n*"
+    )
+    formatted["character_revelations"] = character_revelations
+
+    _, _, timeline = metadata.get("unified_timeline", "").partition("\n\n*")
+    formatted["timeline"] = timeline
+
+    _, _, overall_contradictions = metadata.get("overall_contradictions", "").partition(
+        "\n\n*"
+    )
+    formatted["overall_contradictions"] = overall_contradictions
+
+    _, _, overall_resolution = metadata.get("overall_resolution", "").partition("\n\n*")
+    formatted["overall_resolution"] = overall_resolution
+
     return formatted
 
 
@@ -730,7 +802,16 @@ def main():
 
     # Start interactive conversation with the folder
     # have_conversation_with_story(folder_path)
-    print(chat_bot(folder_path, "What is the main character's name?"))
+    # store analysis in json file in root
+    # analysis_result = analysis(folder_path)
+    # with open("analysis.json", "w") as f:
+    #     json.dump(analysis_result, f, indent=2)
+    # print("Analysis saved to analysis.json")
+    # print(chat_bot(folder_path, "What is the main character's name?"))
+    # test rest of apis
+    print(file_deleted(folder_path, "book.txt"))
+    print(file_uploaded(folder_path, "book.txt"))
+    print(folder_deleted(folder_path))
 
 
 if __name__ == "__main__":
