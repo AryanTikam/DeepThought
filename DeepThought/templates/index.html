@@ -1,0 +1,667 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fictional Universe Consistency Kit</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .chat-container {
+            height: calc(100vh - 150px);
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .toolbar {
+            border-top: 1px solid #dee2e6;
+            padding: 10px 0;
+            background-color: #f8f9fa;
+        }
+        .chat-input {
+            border-radius: 20px;
+            padding-right: 70px;
+        }
+        .send-btn {
+            position: absolute;
+            right: 10px;
+            top: 5px;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tool-btn {
+            border-radius: 20px;
+            margin: 0 5px;
+            font-size: 0.9rem;
+        }
+        .message {
+            margin-bottom: 15px;
+            max-width: 80%;
+        }
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            border-radius: 18px 18px 0 18px;
+            padding: 10px 15px;
+            margin-left: auto;
+        }
+        .bot-message {
+            background-color: #e9ecef;
+            color: #212529;
+            border-radius: 18px 18px 18px 0;
+            padding: 10px 15px;
+            margin-right: auto;
+        }
+        .message-container {
+            display: flex;
+            flex-direction: column;
+        }
+        .typing-indicator {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #e9ecef;
+            border-radius: 18px;
+        }
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            margin: 0 1px;
+            background-color: #6c757d;
+            display: inline-block;
+            border-radius: 50%;
+            animation: typing 1s infinite ease-in-out;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        .sidebar {
+            background-color: #343a40;
+            color: white;
+            height: 100vh;
+            padding-top: 20px;
+        }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        .nav-link:hover, .nav-link.active {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        .nav-link i {
+            margin-right: 10px;
+            width: 20px;
+        }
+        .graph-container {
+            height: 400px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+        #knowledgeGraph {
+            width: 100%;
+            height: 100%;
+        }
+        @keyframes typing {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0px); }
+        }
+        .modal-xl {
+            max-width: 90%;
+        }
+        .contradiction-card {
+            border-left: 4px solid #dc3545;
+            margin-bottom: 15px;
+        }
+        .data-card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .data-card:hover {
+            transform: translateY(-5px);
+        }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .status-fact {
+            background-color: #28a745;
+            color: white;
+        }
+        .status-speculation {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .status-contradiction {
+            background-color: #dc3545;
+            color: white;
+        }
+        .status-unknown {
+            background-color: #6c757d;
+            color: white;
+        }
+        .content-section {
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="logo">
+                    <i class="fas fa-brain"></i> FUCK
+                    <div class="small text-muted">Fictional Universe Consistency Kit</div>
+                </div>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" id="chatTab">
+                            <i class="fas fa-comments"></i> Chat
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="elementsTab">
+                            <i class="fas fa-puzzle-piece"></i> Extract Elements
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="contradictionsTab">
+                            <i class="fas fa-exclamation-triangle"></i> Find Contradictions
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="factCheckTab">
+                            <i class="fas fa-check-circle"></i> Fact Checker
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="graphTab">
+                            <i class="fas fa-project-diagram"></i> Knowledge Graph
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="openQuestionsTab">
+                            <i class="fas fa-question-circle"></i> Open Questions
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="searchDatasetsTab">
+                            <i class="fas fa-database"></i> Search Datasets
+                        </a>
+                    </li>
+                </ul>
+                <hr>
+                <div class="px-3">
+                    <div class="text-muted mb-2">Current Universe</div>
+                    <select class="form-select form-select-sm" id="universeSelector">
+                        <option value="">Select Universe</option>
+                        <option value="marvel">Marvel</option>
+                        <option value="dc">DC Comics</option>
+                        <option value="star_wars">Star Wars</option>
+                        <option value="tolkien">Middle-earth</option>
+                        <option value="custom">Custom...</option>
+                    </select>
+                </div>
+                <hr>
+                <div class="px-3 small text-muted">
+                    <div>Powered by</div>
+                    <div>• Gemini 2.0</div>
+                    <div>• Project Gutenberg</div>
+                    <div>• Comic Characters Dataset</div>
+                    <div>• Fictional Worlds Dataset</div>
+                </div>
+            </div>
+
+            <!-- Main content -->
+            <div class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2" id="pageTitle">Chat with Fictional Universe Consistency Kit</h1>
+                </div>
+
+                <!-- Chat Interface (Default View) -->
+                <div id="chatInterface" class="content-section active">
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="message-container">
+                                <div class="bot-message message">
+                                    Hello! I'm your Fictional Universe Consistency Kit assistant. How can I help maintain continuity in your fictional world today?
+                                </div>
+                            </div>
+                        </div>
+                        <div class="toolbar">
+                            <div class="d-flex">
+                                <button class="btn btn-outline-secondary tool-btn" id="extractToolBtn">
+                                    <i class="fas fa-puzzle-piece"></i> Extract
+                                </button>
+                                <button class="btn btn-outline-secondary tool-btn" id="contradictionToolBtn">
+                                    <i class="fas fa-exclamation-triangle"></i> Contradictions
+                                </button>
+                                <button class="btn btn-outline-secondary tool-btn" id="factCheckToolBtn">
+                                    <i class="fas fa-check-circle"></i> Fact Check
+                                </button>
+                                <button class="btn btn-outline-secondary tool-btn" id="graphToolBtn">
+                                    <i class="fas fa-project-diagram"></i> Graph
+                                </button>
+                            </div>
+                        </div>
+                        <div class="position-relative mt-3">
+                            <input type="text" class="form-control chat-input" id="chatInput" placeholder="Ask something about fictional universes...">
+                            <button class="btn btn-primary send-btn" id="sendBtn">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Extract Elements Interface -->
+                <div id="elementsInterface" class="content-section">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Extract Elements from Text</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="sourceName" class="form-label">Source Name</label>
+                                        <input type="text" class="form-control" id="sourceName" placeholder="e.g. Harry Potter and the Philosopher's Stone">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="sourceType" class="form-label">Source Type</label>
+                                        <select class="form-select" id="sourceType">
+                                            <option value="novel">Novel</option>
+                                            <option value="film">Film/TV Script</option>
+                                            <option value="comic">Comic/Graphic Novel</option>
+                                            <option value="game">Game</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="textContent" class="form-label">Content</label>
+                                        <textarea class="form-control" id="textContent" rows="15" placeholder="Paste text content here..."></textarea>
+                                    </div>
+                                    <button class="btn btn-primary" id="extractElementsBtn">Extract Elements</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Extracted Elements</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info" id="noElementsMsg">
+                                        <i class="fas fa-info-circle"></i> Extract elements to see results here.
+                                    </div>
+                                    <div id="extractedElements" style="display: none;">
+                                        <ul class="nav nav-tabs" id="elementTabs">
+                                            <li class="nav-item">
+                                                <a class="nav-link active" data-bs-toggle="tab" href="#charactersTab">Characters</a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#locationsTab">Locations</a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#eventsTab">Timeline Events</a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#rulesTab">World Rules</a>
+                                            </li>
+                                        </ul>
+                                        <div class="tab-content mt-3">
+                                            <div class="tab-pane fade show active" id="charactersTab">
+                                                <div id="charactersList"></div>
+                                            </div>
+                                            <div class="tab-pane fade" id="locationsTab">
+                                                <div id="locationsList"></div>
+                                            </div>
+                                            <div class="tab-pane fade" id="eventsTab">
+                                                <div id="eventsList"></div>
+                                            </div>
+                                            <div class="tab-pane fade" id="rulesTab">
+                                                <div id="rulesList"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contradictions Interface -->
+                <div id="contradictionsInterface" class="content-section">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Find Contradictions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="contradictionType" class="form-label">Contradiction Type</label>
+                                        <select class="form-select" id="contradictionType">
+                                            <option value="character">Character Timeline</option>
+                                            <option value="world_rules">World Rules</option>
+                                            <option value="both">Both</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3" id="characterSelectDiv">
+                                        <label for="characterSelect" class="form-label">Character</label>
+                                        <select class="form-select" id="characterSelect">
+                                            <option value="">Select a character...</option>
+                                        </select>
+                                    </div>
+                                    <button class="btn btn-primary" id="findContradictionsBtn">Find Contradictions</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Detected Contradictions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info" id="noContradictionsMsg">
+                                        <i class="fas fa-info-circle"></i> Find contradictions to see results here.
+                                    </div>
+                                    <div id="contradictionResults" style="display: none;">
+                                        <div class="mb-4">
+                                            <h6 class="text-muted">Character Timeline Contradictions</h6>
+                                            <div id="characterContradictions"></div>
+                                        </div>
+                                        <div>
+                                            <h6 class="text-muted">World Rule Contradictions</h6>
+                                            <div id="ruleContradictions"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fact Checker Interface -->
+                <div id="factCheckInterface" class="content-section">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Fact Check Statement</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="universeForFactCheck" class="form-label">Universe</label>
+                                        <select class="form-select" id="universeForFactCheck">
+                                            <option value="">Select Universe</option>
+                                            <option value="marvel">Marvel</option>
+                                            <option value="dc">DC Comics</option>
+                                            <option value="star_wars">Star Wars</option>
+                                            <option value="tolkien">Middle-earth</option>
+                                            <option value="custom">Custom...</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="factCheckStatement" class="form-label">Statement to Check</label>
+                                        <textarea class="form-control" id="factCheckStatement" rows="5" placeholder="Enter a statement to verify..."></textarea>
+                                        <div class="form-text">Example: "Luke Skywalker built his green lightsaber before meeting Yoda."</div>
+                                    </div>
+                                    <button class="btn btn-primary" id="checkFactBtn">Check Statement</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-7">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Fact Check Results</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info" id="noFactCheckMsg">
+                                        <i class="fas fa-info-circle"></i> Check a statement to see results here.
+                                    </div>
+                                    <div id="factCheckResults" style="display: none;">
+                                        <div class="mb-3">
+                                            <span class="status-badge" id="statusBadge">Status</span>
+                                            <span class="ms-2" id="confidenceDisplay">Confidence: 0%</span>
+                                        </div>
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <h6>Explanation</h6>
+                                                <p id="explanationText"></p>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <h6>Related Knowledge Elements</h6>
+                                            <div id="relatedElements"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Knowledge Graph Interface -->
+                <div id="graphInterface" class="content-section">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Graph Controls</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="elementSelect" class="form-label">Center Element</label>
+                                        <select class="form-select" id="elementSelect">
+                                            <option value="">Select an element...</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="depthSlider" class="form-label">Graph Depth: <span id="depthValue">2</span></label>
+                                        <input type="range" class="form-range" id="depthSlider" min="1" max="5" value="2">
+                                    </div>
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="showCharacters" checked>
+                                            <label class="form-check-label" for="showCharacters">
+                                                <i class="fas fa-user text-primary"></i> Characters
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="showLocations" checked>
+                                            <label class="form-check-label" for="showLocations">
+                                                <i class="fas fa-map-marker-alt text-success"></i> Locations
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="showEvents" checked>
+                                            <label class="form-check-label" for="showEvents">
+                                                <i class="fas fa-calendar text-warning"></i> Events
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="showRules" checked>
+                                            <label class="form-check-label" for="showRules">
+                                                <i class="fas fa-book text-danger"></i> Rules
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary" id="updateGraphBtn">Update Graph</button>
+                                </div>
+                            </div>
+                            <div class="card mt-3">
+                                <div class="card-header">
+                                    <h5>Graph Statistics</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Nodes:</strong> <span id="nodeCount">0</span></p>
+                                    <p><strong>Edges:</strong> <span id="edgeCount">0</span></p>
+                                    <div class="small text-muted">
+                                        <div><i class="fas fa-user text-primary"></i> Characters: <span id="charCount">0</span></div>
+                                        <div><i class="fas fa-map-marker-alt text-success"></i> Locations: <span id="locCount">0</span></div>
+                                        <div><i class="fas fa-calendar text-warning"></i> Events: <span id="eventCount">0</span></div>
+                                        <div><i class="fas fa-book text-danger"></i> Rules: <span id="ruleCount">0</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-9">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Knowledge Graph Visualization</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="graph-container">
+                                        <div id="knowledgeGraph"></div>
+                                    </div>
+                                    <div class="alert alert-info mt-3" id="noGraphDataMsg">
+                                        <i class="fas fa-info-circle"></i> Select an element and click "Update Graph" to visualize the knowledge graph.
+                                    </div>
+                                    <div id="elementDetails" class="mt-3" style="display: none;">
+                                        <h6>Selected Element Details</h6>
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <h6 id="selectedElementName"></h6>
+                                                <div id="selectedElementDetails"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Open Questions Interface -->
+                <div id="openQuestionsInterface" class="content-section">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Find Open Questions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="universeForQuestions" class="form-label">Universe</label>
+                                        <select class="form-select" id="universeForQuestions">
+                                            <option value="">Select Universe</option>
+                                            <option value="marvel">Marvel</option>
+                                            <option value="dc">DC Comics</option>
+                                            <option value="star_wars">Star Wars</option>
+                                            <option value="tolkien">Middle-earth</option>
+                                            <option value="custom">Custom...</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3" id="customUniverseInput" style="display: none;">
+                                        <label for="customUniverse" class="form-label">Custom Universe Name</label>
+                                        <input type="text" class="form-control" id="customUniverse" placeholder="Enter universe name...">
+                                    </div>
+                                    <button class="btn btn-primary" id="findQuestionsBtn">Find Open Questions</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Open Questions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info" id="noQuestionsMsg">
+                                        <i class="fas fa-info-circle"></i> Find open questions to see results here.
+                                    </div>
+                                    <div id="openQuestionsList" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search Datasets Interface -->
+                <div id="searchDatasetsInterface" class="content-section">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Search Reference Datasets</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="datasetQuery" class="form-label">Search Query</label>
+                                        <input type="text" class="form-control" id="datasetQuery" placeholder="e.g., Spider-Man, Mordor, etc.">
+                                    </div>
+                                    <button class="btn btn-primary" id="searchDatasetsBtn">Search</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Search Results</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info" id="noResultsMsg">
+                                        <i class="fas fa-info-circle"></i> Search datasets to see results here.
+                                    </div>
+                                    <div id="searchResults" style="display: none;">
+                                        <ul class="nav nav-tabs" id="resultTabs">
+                                            <li class="nav-item">
+                                                <a class="nav-link active" data-bs-toggle="tab" href="#charactersResults">Characters</a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#worldsResults">Fictional Worlds</a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#gutenbergResults">Project Gutenberg</a>
+                                            </li>
+                                        </ul>
+                                        <div class="tab-content mt-3">
+                                            <div class="tab-pane fade show active" id="charactersResults">
+                                                <div id="characterResultsList"></div>
+                                            </div>
+                                            <div class="tab-pane fade" id="worldsResults">
+                                                <div id="worldsResultsList"></div>
+                                            </div>
+                                            <div class="tab-pane fade" id="gutenbergResults">
+                                                <div id="gutenbergResultsList"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
