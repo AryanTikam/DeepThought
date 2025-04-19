@@ -1,3 +1,4 @@
-stories
-data
+DeepThought/universes/hitch
+DeepThought/universes/random
 .env
+backend/fin.py

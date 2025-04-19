@@ -8,8 +8,8 @@ app = Flask(__name__)
 @app.route("/file_deleted", methods=["POST"])
 def file_deleted_api():
     data = request.get_json()
-    file_id = data.get("file_id")
-    user_id = data.get("user_id")
+    file_id = data.get("file_name")
+    user_id = data.get("folder_path")
     result = file_deleted(file_id, user_id)
     return jsonify(result)
 
@@ -27,6 +27,7 @@ def file_uploaded_api():
     data = request.get_json()
     file_id = data.get("folder_path")
     user_id = data.get("file_name")
+    print(file_id, user_id)
     result = file_uploaded(file_id, user_id)
     return jsonify(result)
 
