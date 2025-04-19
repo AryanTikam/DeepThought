@@ -4,8 +4,7 @@ import uvicorn
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
-import io  # Import io for handling file streams
-
+import io 
 from utils import load_text_from_file, ensure_upload_folder, UPLOAD_FOLDER
 from processing import analyze_text
 

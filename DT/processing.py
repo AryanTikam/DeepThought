@@ -114,6 +114,25 @@ speculation_chain = LLMChain(llm=llm, prompt=SPECULATION_PROMPT)
 
 # --- Core Processing Function ---
 
+def clean_json_output(response_text):
+    """
+    Clean and parse JSON output from LLM responses.
+    Returns either a parsed JSON object (dict/list) or the original text if parsing fails.
+    """
+    # Remove markdown-style JSON formatting if present
+    if isinstance(response_text, str):
+        if response_text.startswith("```json"):
+            response_text = response_text.strip("```json").strip("```")
+        
+        # Ensure the response is valid JSON
+        try:
+            return json.loads(response_text)
+        except json.JSONDecodeError:
+            return response_text  # Return raw text if not valid JSON
+    else:
+        # If already a Python object (dict/list), return as is
+        return response_text
+
 def analyze_text(text: str) -> dict:
     """
     Analyzes the input text to extract knowledge graph, contradictions, and speculation boundaries.
@@ -160,37 +179,50 @@ def analyze_text(text: str) -> dict:
         print("Extracting Knowledge Graph...")
         try:
             kg_result_raw = kg_chain.run(context=full_context)
-            results["knowledge_graph"] = json.loads(kg_result_raw)
-        except json.JSONDecodeError:
-            print("Error decoding KG JSON:", kg_result_raw)
-            results["knowledge_graph"] = {"error": "Failed to parse Knowledge Graph JSON from LLM.", "raw_output": kg_result_raw}
+            kg_result = clean_json_output(kg_result_raw)
+            if isinstance(kg_result, (dict, list)):
+                results["knowledge_graph"] = kg_result
+            else:
+                try:
+                    results["knowledge_graph"] = json.loads(kg_result)
+                except json.JSONDecodeError:
+                    print("Error decoding KG JSON:", kg_result)
+                    results["knowledge_graph"] = {"error": "Failed to parse Knowledge Graph JSON from LLM.", "raw_output": str(kg_result)}
         except Exception as e:
-             print(f"Error in KG chain: {e}")
-             results["knowledge_graph"] = {"error": str(e)}
-
+            print(f"Error in KG chain: {e}")
+            results["knowledge_graph"] = {"error": str(e)}
 
         print("Detecting Contradictions...")
         try:
             contradiction_result_raw = contradiction_chain.run(context=full_context)
-            results["contradictions"] = json.loads(contradiction_result_raw)
-        except json.JSONDecodeError:
-            print("Error decoding Contradictions JSON:", contradiction_result_raw)
-            results["contradictions"] = {"error": "Failed to parse Contradictions JSON from LLM.", "raw_output": contradiction_result_raw}
+            contradiction_result = clean_json_output(contradiction_result_raw)
+            if isinstance(contradiction_result, (dict, list)):
+                results["contradictions"] = contradiction_result
+            else:
+                try:
+                    results["contradictions"] = json.loads(contradiction_result)
+                except json.JSONDecodeError:
+                    print("Error decoding Contradictions JSON:", contradiction_result)
+                    results["contradictions"] = {"error": "Failed to parse Contradictions JSON from LLM.", "raw_output": str(contradiction_result)}
         except Exception as e:
-             print(f"Error in Contradiction chain: {e}")
-             results["contradictions"] = {"error": str(e)}
-
+            print(f"Error in Contradiction chain: {e}")
+            results["contradictions"] = {"error": str(e)}
 
         print("Identifying Speculation Boundaries...")
         try:
             speculation_result_raw = speculation_chain.run(context=full_context)
-            results["speculation_boundaries"] = json.loads(speculation_result_raw)
-        except json.JSONDecodeError:
-            print("Error decoding Speculation JSON:", speculation_result_raw)
-            results["speculation_boundaries"] = {"error": "Failed to parse Speculation Boundaries JSON from LLM.", "raw_output": speculation_result_raw}
+            speculation_result = clean_json_output(speculation_result_raw)
+            if isinstance(speculation_result, (dict, list)):
+                results["speculation_boundaries"] = speculation_result
+            else:
+                try:
+                    results["speculation_boundaries"] = json.loads(speculation_result)
+                except json.JSONDecodeError:
+                    print("Error decoding Speculation JSON:", speculation_result)
+                    results["speculation_boundaries"] = {"error": "Failed to parse Speculation Boundaries JSON from LLM.", "raw_output": str(speculation_result)}
         except Exception as e:
-             print(f"Error in Speculation chain: {e}")
-             results["speculation_boundaries"] = {"error": str(e)}
+            print(f"Error in Speculation chain: {e}")
+            results["speculation_boundaries"] = {"error": str(e)}
 
         print("Analysis complete.")
         return results
