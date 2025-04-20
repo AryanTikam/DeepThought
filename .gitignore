@@ -3,3 +3,4 @@ DeepThought/universes/random
 .env
 backend/apis.py
 backend/__pycache__
+finv2.py
