@@ -248,6 +248,23 @@ function enableDragAndDrop() {
   });
 }
 
+// Add event listener to the user input field to close reports when typing
+document.getElementById("user-input").addEventListener("input", function() {
+  // Check if knowledge graph or contradiction report is displayed
+  const chatOutput = document.getElementById("chat-output");
+  if (chatOutput.querySelector(".graph-container") || chatOutput.querySelector(".contradiction-report")) {
+    // Reset the chat output to a clean state
+    chatOutput.innerHTML = `
+      <div class="universe-info">
+        <h3><i class="fas fa-comment"></i> Chat Mode</h3>
+        <p>Type your message and press Enter to send.</p>
+      </div>
+    `;
+  }
+});
+
+// Improve the existing sendMessage function to implement actual chat functionality
+// Fix the JSON parsing issue in the sendMessage function
 function sendMessage() {
   const input = document.getElementById("user-input");
   const message = input.value.trim();
@@ -255,22 +272,97 @@ function sendMessage() {
 
   const chatOutput = document.getElementById("chat-output");
 
+  // Close any open report first (this is a safety check in addition to the input listener)
+  if (chatOutput.querySelector(".graph-container") || chatOutput.querySelector(".contradiction-report")) {
+    chatOutput.innerHTML = "";
+  }
+
   // Create user message
   const userMsgDiv = document.createElement("div");
   userMsgDiv.className = "user-message";
   userMsgDiv.innerHTML = `<span class="message-avatar">👤</span> ${message}`;
   chatOutput.appendChild(userMsgDiv);
 
-  // Create system response (placeholder)
-  const botMsgDiv = document.createElement("div");
-  botMsgDiv.className = "bot-message";
-  botMsgDiv.innerHTML = `<span class="message-avatar">🤖</span> Feature under development. Try exploring the Knowledge Graph or Contradiction Report!`;
-  chatOutput.appendChild(botMsgDiv);
+  // Show typing indicator while waiting for response
+  const typingIndicator = document.createElement("div");
+  typingIndicator.className = "bot-message typing-indicator";
+  typingIndicator.innerHTML = `<span class="message-avatar">🤖</span> <span class="typing-dots">...</span>`;
+  chatOutput.appendChild(typingIndicator);
+
+  // Get the active universe path
+  const activeUniverse = document.querySelector(".universe.selected");
+  const universeId = activeUniverse ? activeUniverse.id : "";
+  const universeName = activeUniverse ? activeUniverse.querySelector("span").textContent.trim() : "";
+  
+  
+  // Send message to chat_bot API
+  fetch("/call_chat_bot", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      universeId: universeId,
+      message: message,
+    }),
+  })
+  .then(response => {
+    // First check if response is OK
+    if (!response.ok) {
+      throw new Error(`Server responded with status: ${response.status}`);
+    }
+    return response.text(); // Get the raw text first
+  })
+  .then(text => {
+    // Try to parse the JSON, with error handling
+    try {
+      const result = JSON.parse(text);
+      // Remove typing indicator
+      chatOutput.removeChild(typingIndicator);
+      
+      // Create bot response message
+      const botMsgDiv = document.createElement("div");
+      botMsgDiv.className = "bot-message";
+      botMsgDiv.innerHTML = `<span class="message-avatar">🤖</span> ${result.answer || "No response received from bot."}`;
+      chatOutput.appendChild(botMsgDiv);
+    } catch (parseError) {
+      console.error("Error parsing JSON:", parseError, "Raw response:", text);
+      
+      // Handle unparseable response by displaying the raw text
+      chatOutput.removeChild(typingIndicator);
+      
+      const errorMsgDiv = document.createElement("div");
+      errorMsgDiv.className = "bot-message";
+      errorMsgDiv.innerHTML = `<span class="message-avatar">🤖</span> ${text || "Received unparseable response."}`;
+      chatOutput.appendChild(errorMsgDiv);
+    }
+  })
+  .catch(error => {
+    // Remove typing indicator
+    if (typingIndicator.parentNode) {
+      chatOutput.removeChild(typingIndicator);
+    }
+    
+    // Show error message
+    const errorMsgDiv = document.createElement("div");
+    errorMsgDiv.className = "bot-message error-message";
+    errorMsgDiv.innerHTML = `<span class="message-avatar">🤖</span> Sorry, there was an error processing your request: ${error.message}`;
+    chatOutput.appendChild(errorMsgDiv);
+    console.error("Chat error:", error);
+  });
 
   // Clear input and scroll to bottom
   input.value = "";
   chatOutput.scrollTop = chatOutput.scrollHeight;
 }
+
+// Add event listener for pressing Enter to send message
+document.getElementById("user-input")?.addEventListener("keypress", function(event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    sendMessage();
+  }
+});
 
 async function showKnowledgeGraph() {
   const selectedUniverse = document.querySelector(".universe.selected");
@@ -414,68 +506,6 @@ function renderKnowledgeGraph(data, universeName) {
               Object.keys(relationshipTypes).length
             }</div>
             <div class="stat-label">Relationship Types</div>
-          </div>
-        </div>
-        
-        <div class="detailed-stats">
-          <div class="entity-distribution">
-            <h4><i class="fas fa-tags"></i> Entity Distribution</h4>
-            <div class="distribution-bars">
-              ${Object.keys(entityTypes)
-                .map(
-                  (type) => `
-                <div class="distribution-item">
-                  <div class="dist-label">${type}</div>
-                  <div class="dist-bar-container">
-                    <div class="dist-bar" style="width: ${(
-                      (entityTypes[type] / graphData.nodes.length) *
-                      100
-                    ).toFixed(1)}%; background-color: ${getNodeColor(
-                    type
-                  )};"></div>
-                  </div>
-                  <div class="dist-value">${entityTypes[type]}</div>
-                </div>
-              `
-                )
-                .join("")}
-            </div>
-          </div>
-          
-          <div class="relationship-analysis">
-            <h4><i class="fas fa-exchange-alt"></i> Top Relationships</h4>
-            <ul class="relationship-list">
-              ${getTopRelationships(relationshipTypes, 5)
-                .map(
-                  (rel) => `
-                <li class="relationship-item">
-                  <span class="relationship-name">${rel[0]}</span>
-                  <span class="relationship-count">${rel[1]}</span>
-                </li>
-              `
-                )
-                .join("")}
-            </ul>
-          </div>
-        </div>
-        
-        <div class="centrality-analysis">
-          <h4><i class="fas fa-star"></i> Most Central Entities</h4>
-          <div class="centrality-list">
-            ${getTopCentralNodes(graphData, 5)
-              .map(
-                (node, idx) => `
-              <div class="centrality-item">
-                <div class="rank">#${idx + 1}</div>
-                <div class="entity-name">${node.id}</div>
-                <div class="entity-type" style="background-color: ${getNodeColor(
-                  node.type
-                )}">${node.type}</div>
-                <div class="connections">${node.connections} connections</div>
-              </div>
-            `
-              )
-              .join("")}
           </div>
         </div>
       </div>
@@ -1150,10 +1180,6 @@ function renderContradictionReport(data, universeName) {
       <div class="contradictions-section">
         <div class="section-header">
           <h3><i class="fas fa-exclamation-triangle"></i> Contradictions Analysis</h3>
-          <div class="stats-badge">
-            <span class="count">${totalContradictions}</span>
-            <span class="label">Potential Issues</span>
-          </div>
         </div>
         
         <div class="confidence-distribution">
@@ -1257,10 +1283,6 @@ function renderContradictionReport(data, universeName) {
       <div class="speculation-section">
         <div class="section-header">
           <h3><i class="fas fa-lightbulb"></i> Speculation & Uncertainty Analysis</h3>
-          <div class="stats-badge">
-            <span class="count">${speculationBoundaries.length}</span>
-            <span class="label">Elements</span>
-          </div>
         </div>
         
         <div class="speculation-intro">

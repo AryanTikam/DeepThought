@@ -1,6 +1,5 @@
 # app.py
 import os
-import uvicorn
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
@@ -189,7 +188,9 @@ def chat_bot_api():
     data = request.get_json()
     user_id = data.get("folder_path")
     message = data.get("message")
+    print(user_id, message)
     result = chat_bot(user_id, message)
+    print(result)
     return jsonify(result)
 
 

@@ -638,6 +638,7 @@ button {
   font-size: 0.95rem;
   color: #5a6483;
   font-weight: 500;
+  background-color: #f8faff;
 }
 
 .legend-color {
@@ -674,6 +675,7 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 25px;
   margin-bottom: 40px;
+  align-items: center;
 }
 
 .stat-card {
@@ -1038,7 +1040,7 @@ button {
 }
 
 .summary-content p {
-  color: var(--text-secondary);
+  color: var(--text-light);
   font-size: 0.95rem;
 }
 
@@ -1069,6 +1071,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
+  color: var(--text-light);
 }
 
 .stats-badge .count {
@@ -1096,15 +1099,18 @@ button {
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  background-color: #f8faff;
+  background-color: white;
 }
 
 .confidence-item.high {
-  border-top: 3px solid #ff6b6b;
+  border-top: 3px solid black;
 }
 
 .confidence-item.medium {
-  border-top: 3px solid #ffc107;
+  border-top: 3px;
+  background-color: white;
+  position: relative; /* keeps it in flow */
+  z-index: 10;        /* higher than surrounding elements */
 }
 
 .confidence-item.low {
@@ -1113,12 +1119,13 @@ button {
 
 .confidence-label {
   font-size: 0.9rem;
-  color: var(--text-secondary);
+  color : black;
   font-weight: 500;
 }
 
 .confidence-value {
   font-size: 1.5rem;
+  color : black;
   font-weight: 700;
 }
 
@@ -1127,7 +1134,7 @@ button {
 }
 
 .confidence-item.medium .confidence-value {
-  color: #ffc107;
+  color: black;
 }
 
 .confidence-item.low .confidence-value {
@@ -1240,6 +1247,7 @@ button {
   border-radius: var(--border-radius-md);
   padding: 20px;
   border: 1px solid #e6e9f0;
+  color: #3d3d3e;
 }
 
 .description-header {
@@ -1427,4 +1435,7 @@ button {
   font-size: 1rem;
   max-width: 500px;
   margin: 0 auto;
+}
+.confidence-item{
+  background-color: WHITE !important;
 }
